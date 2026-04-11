@@ -1,51 +1,22 @@
 ```
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-*.class
-*.dll
-*.so
-*.a
-*.exe
-*.out
-
 # Dependencies
-vendor/
 node_modules/
-*.lock
+vendor/
+composer.lock
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
-*.swo
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# Distribution and build
-dist/
-build/
-target/
-*.tar
-*.zip
-*.gz
-*.tar.gz
-
-# Testing and coverage
-.coverage
-coverage/
-htmlcov/
 
 # OS generated files
 .DS_Store

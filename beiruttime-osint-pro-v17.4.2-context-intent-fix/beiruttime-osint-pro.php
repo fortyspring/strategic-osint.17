@@ -8505,7 +8505,7 @@ public static function ajax_duplicate_cleanup_batch() {
 
     // keep seen bounded
     if (count($seen) > 4000) {
-        $seen = array_slice($seen, -4000, None, True);
+        $seen = array_slice($seen, -4000);
     }
 
     $next_cursor = $cursor + count($rows);
@@ -13559,7 +13559,7 @@ add_shortcode('osint_command_center', function(){
 add_action('wp_ajax_so_ajax_duplicate_cleanup_batch', ['SO_Admin_UI', 'ajax_duplicate_cleanup_batch']);
 add_action('wp_ajax_so_ajax_duplicate_cleanup_reset', ['SO_Admin_UI', 'ajax_duplicate_cleanup_reset']);
 
-
+// إعادة التحليل الكامل - AJAX Handlers
 add_action('wp_ajax_so_ajax_reanalyze_batch', ['SO_Admin_UI', 'ajax_reanalyze_batch']);
 add_action('wp_ajax_so_ajax_reanalyze_reset', ['SO_Admin_UI', 'ajax_reanalyze_reset']);
 
