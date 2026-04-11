@@ -11,6 +11,11 @@ namespace Beiruttime\OSINT\Admin;
 
 use Beiruttime\OSINT\Traits\Singleton;
 
+// تعريف الثابت إذا لم يكن معرفاً
+if (!defined('BEIRUTTIME_OSINT_PRO_PLUGIN_DIR')) {
+    define('BEIRUTTIME_OSINT_PRO_PLUGIN_DIR', plugin_dir_path(dirname(__DIR__, 2)));
+}
+
 /**
  * فئة AdminMenu
  */
