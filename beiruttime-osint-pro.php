@@ -920,15 +920,27 @@ function so_bt_score_news_v2($title, $classification, $actor, $region, $source_n
 function so_bt_classify_v4($title, $source_name = '', $region = '', $actor = '') {
     $t = so_clean_text((string)$title);
     $s = so_clean_text((string)$source_name);
+    $a = so_clean_text((string)$actor);
     $full = trim($t . ' ' . $s);
+    
+    // Check actor for resistance/military actors first
+    $is_resistance_actor = preg_match('/(المقاومة الإسلامية|حزب الله|حماس|الجهاد الإسلامي|كتائب القسام|سرايا القدس|الحرس الثوري|قوة القدس)/ui', $a);
+    $is_enemy_actor = preg_match('/(جيش العدو الإسرائيلي|العدو الإسرائيلي|الجيش الإسرائيلي|الجبهة الداخلية| IDF |Israel)/ui', $a);
 
     // 0) Non-intel / technical / awareness content
     if (preg_match('/(حماية_الخصوصية|أمن_المعلومات|أندرويد|هذا الفيديو يعرض|إعدادات مهم(?:ة|ّة)|نشرة تقنية|نصائح تقنية|خصوصية|التكنولوجيا)/ui', $full)) {
         return 'غير استخباراتي';
     }
 
-    // 1) Military / security FIRST, even if source says "reporter" or "media"
-    if (preg_match('/(غارة|غارات|قصف|استهداف|اعتداء إسرائيلي|اعتداء اسرائيلي|عدوان|العدوان|صاروخ|صواريخ|صلية|مسيّرة|مسيرة|فسفوري|ميركافا|أغار|اغار|ضربة|اغتيال|هجوم مزدوج|محلّقة انقضاضية|طيران حربي|الطيران الحربي المعادي|استهدف بلد|استهدف بلدة|استهدفت بلدة|مجزرة|شهداء العدوان|جراء العدوان|استهداف إسرائيلي|استهداف اسرائيلي)/ui', $full)) {
+    // 1) Military / security FIRST - Enhanced to catch resistance operations even with media sources
+    $military_keywords = '(غارة|غارات|قصف|استهداف|اعتداء إسرائيلي|اعتداء اسرائيلي|عدوان|العدوان|صاروخ|صواريخ|صلية|مسيّرة|مسيرة|فسفوري|ميركافا|أغار|اغار|ضربة|اغتيال|هجوم مزدوج|محلّقة انقضاضية|طيران حربي|الطيران الحربي المعادي|استهدف بلد|استهدف بلدة|استهدفت بلدة|مجزرة|شهداء العدوان|جراء العدوان|استهداف إسرائيلي|استهداف اسرائيلي|اقتحام|اعتقالات|دبابات|مدفعي|رصد قصف|raid|strike|bombing|missile|drone)';
+    
+    if (preg_match('/'.$military_keywords.'/ui', $full)) {
+        return 'عسكري/أمني';
+    }
+    
+    // Also classify as military if actor is resistance/enemy and title mentions attack/target
+    if (($is_resistance_actor || $is_enemy_actor) && preg_match('/(استهدف|استهداف|ضرب|قصف|أطلق|صاروخ|مسيّرة|عملية|كمين|اشتباك)/ui', $t)) {
         return 'عسكري/أمني';
     }
 
@@ -938,7 +950,7 @@ function so_bt_classify_v4($title, $source_name = '', $region = '', $actor = '')
     }
 
     // 3) Economic / logistics
-    if (preg_match('/(خام برنت|العقود الآجلة|النفط|الغاز|الشحنات|الملاحة|إمدادات|مضيق هرمز|ناقلات|أسواق|للبرميل|الطاقة|مشاريع نفطية|وقود)/ui', $full)) {
+    if (preg_match('/(خام برنت|العقود الآجلة|النفط|الغاز|الشحنات|الملاحة|إمدادات|مضيق هرمز|ناقلات|أسواق|للبرميل|الطاقة|مشاريع نفطية|وقود|اقتصادي|اقتصادية)/ui', $full)) {
         return 'اقتصادي/لوجستي';
     }
 
@@ -947,13 +959,23 @@ function so_bt_classify_v4($title, $source_name = '', $region = '', $actor = '')
         return 'شجب/استنكار';
     }
 
-    // 5) Political / diplomatic / official
-    if (preg_match('/(وزارة الخارجية|وزير|رئيس|حكومة|بيان|الفاتيكان|بابا الفاتيكان|مجموعة السبع|السفارة|روبيو|السفير|الدفاع|الخارجية|الرئاسة|مجلس الأمن|المستشار الألماني|الحكومة الألمانية|وزراء خارجية|وزيرة الجيوش|الدبلوماسي|مصدر دبلوماسي|الجيش الأردني|وزارة الدفاع|وزارة النفط|وزير الصحة|رئيس الجمهورية|قيادة الجيش|حرس الثورة|قائد قوة القدس)/ui', $full)) {
-        return 'سياسي';
+    // 5) Political / diplomatic / official - Enhanced
+    $political_keywords = '(وزارة الخارجية|وزير|رئيس|حكومة|بيان|الفاتيكان|بابا الفاتيكان|مجموعة السبع|السفارة|روبيو|السفير|الدفاع|الخارجية|الرئاسة|مجلس الأمن|المستشار الألماني|الحكومة الألمانية|وزراء خارجية|وزيرة الجيوش|الدبلوماسي|مصدر دبلوماسي|الجيش الأردني|وزارة الدفاع|وزارة النفط|وزير الصحة|رئيس الجمهورية|قيادة الجيش|حرس الثورة|قائد قوة القدس|مفاوضات|وفد|محادثات|قمة|اجتماع دولي|مبادرة|وساطة|هدنة|وقف إطلاق النار)';
+    
+    if (preg_match('/'.$political_keywords.'/ui', $full)) {
+        // But override if it's clearly about a military action
+        if (!preg_match('/'.$military_keywords.'/ui', $full)) {
+            return 'سياسي';
+        }
+        return 'عسكري/أمني'; // Military takes precedence
     }
 
-    // 6) Media / coverage / commentary
+    // 6) Media / coverage / commentary - Only if no military content
     if (preg_match('/(مراسل|وسائل إعلام|وسائل اعلام|إعلام العدو|اعلام العدو|القناة 12|يديعوت|فوكس نيوز|تغطية خاصة|آخر مستجدات العمليات العسكرية|رويترز|بلومبرغ|أكسيوس|واشنطن بوست|صحيفة|وكالة)/ui', $full)) {
+        // Check if the actual content is about military action despite being from media source
+        if (preg_match('/'.$military_keywords.'/ui', $t) || $is_resistance_actor || $is_enemy_actor) {
+            return 'عسكري/أمني';
+        }
         return 'إعلامي';
     }
 
