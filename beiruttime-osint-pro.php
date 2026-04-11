@@ -51,13 +51,13 @@ function sod_match_bank($text, $bank_values, $options = []) {
         $score = 0;
         $matched_keyword = '';
         
-        // 1. مطابقة تامة للكلمة (أعلى وزن)
+        // 1. مطابقة تامة للكلمة (أعلى وزن) - استخدام mb_stripos للأداء
         foreach ($keywords as $kw) {
             $kw = trim((string)$kw);
             if ($kw === '') continue;
             
-            // مطابقة تامة
-            if (stripos($text, $kw) !== false) {
+            // مطابقة تامة باستخدام mb_stripos (أسرع بكثير من similar_text)
+            if (mb_stripos($text, $kw) !== false) {
                 $score += 15 * $weight;
                 $matched_keyword = $kw;
                 
@@ -68,11 +68,11 @@ function sod_match_bank($text, $bank_values, $options = []) {
             }
         }
         
-        // 2. تشابه نصي عام
-        similar_text($text_clean, $term, $percent);
-        if ($percent > 65) {
-            $score += ($percent - 65) / 3.5 * $weight;
-        }
+        // 2. تشابه نصي عام - تم تعطيله للأداء، الاعتماد على stripos فقط
+        // similar_text($text_clean, $term, $percent);
+        // if ($percent > 65) {
+        //     $score += ($percent - 65) / 3.5 * $weight;
+        // }
         
         // 3. مطابقة الجذور (للغة العربية)
         if (function_exists('sod_arabic_root_match')) {
@@ -85,7 +85,7 @@ function sod_match_bank($text, $bank_values, $options = []) {
         // 4. مكافأة السياق القريب
         if (!empty($options['context_words'])) {
             foreach ((array)$options['context_words'] as $ctx_word) {
-                if (stripos($text, $ctx_word) !== false && $score > 0) {
+                if (mb_stripos($text, $ctx_word) !== false && $score > 0) {
                     $score += 5 * $weight;
                     break;
                 }
@@ -136,6 +136,111 @@ function sod_arabic_root_match($text, $term) {
     return $score;
 }
 
+// ==========================================================================
+// 🧠 ACTOR ENGINE V2 — Contextual Intelligence Layer (V17.4 Upgrade)
+// ==========================================================================
+
+function sod_detect_action_type($text) {
+    $text = so_clean_text($text);
+    
+    // 🔴 أفعال عسكرية صريحة
+    if (preg_match('/(غارة|غارات|قصف|استهداف|هجوم|اشتباك|كمين|إطلاق صواريخ|مسيّرة|مسيرة|طيران|درون|توغل|اقتحام|اغتيال|تفجير|معركة|رصاص|قناص|دبابات|مدفعية|براميل متفجرة|اعتداء|ضربة|انفجار)/ui', $text)) {
+        return 'military';
+    }
+
+    // 🟡 تصريحات وإعلام
+    if (preg_match('/(تصريح|قال|أكد|صرح|أعلن|أفاد|نقل عن|بحسب|وفق|ذكر|كشف|رويترز|وسائل إعلام|تقرير|تحليل|صحيفة|قناة|مراسل|بيان|خطاب|شجب|استنكر|أدان|رحب|حث|دعا|طالب)/ui', $text)) {
+        return 'statement';
+    }
+
+    // 🟢 دبلوماسية وسياسة
+    if (preg_match('/(مفاوضات|محادثات|لقاء|اجتماع|اتفاق|دبلوماسي|وفد|زيارة|قمة|مؤتمر|وزارة الخارجية|الرئيس|رئيس الوزراء|الأمم المتحدة|قرار دولي|مبعوث|وساطة)/ui', $text)) {
+        return 'diplomatic';
+    }
+
+    return 'unknown';
+}
+
+function sod_extract_actors_ranked($text, $bank) {
+    $matches = sod_match_bank($text, $bank);
+    if (empty($matches)) return [];
+    
+    // نأخذ أفضل 3 فاعلين فقط لتجنب الضوضاء
+    $actors = array_keys($matches);
+    return array_slice($actors, 0, 3);
+}
+
+function sod_detect_target_from_text($text) {
+    $text = so_clean_text($text);
+    
+    // محاولة استخراج الهدف بعد أفعال الاستهداف
+    if (preg_match('/(استهدف|قصف|ضرب|هاجم|دمّر|أغار على|أستهدف)\s+(.*?)($|\.|،|;)/ui', $text, $m)) {
+        $target = trim($m[2]);
+        // تنظيف الهدف من الكلمات الزائدة
+        if (strlen($target) > 60) {
+            $target = mb_substr($target, 0, 60) . '...';
+        }
+        return $target;
+    }
+    
+    // محاولة استخراج المنطقة المتأثرة
+    if (preg_match('/(المناطق المتأثرة|في بلدة|في مدينة|على|استهداف|تستهدف)\s+([أ-ي]+(?:\s+[أ-ي]+){0,4})/ui', $text, $m)) {
+        return trim($m[2]);
+    }
+
+    return '';
+}
+
+function sod_actor_engine_v2($text) {
+    $text = so_clean_text($text);
+    $banks = sod_get_all_banks();
+
+    // 1️⃣ تحديد نوع الإجراء أولاً
+    $action_type = sod_detect_action_type($text);
+
+    // ❌ القاعدة الذهبية: لا فاعل هجومي بدون فعل عسكري
+    if ($action_type !== 'military') {
+        return [
+            'primary_actor' => 'فاعل غير محسوم',
+            'secondary_actor' => '',
+            'target' => '',
+            'confidence' => 15,
+            'reason' => 'non-military-context (' . $action_type . ')',
+            'action_type' => $action_type
+        ];
+    }
+
+    // 🟢 2️⃣ إذا كان عسكريًا، نستخرج الفاعلين
+    $actors = sod_extract_actors_ranked($text, $banks['actors']);
+
+    $primary = !empty($actors) ? $actors[0] : 'فاعل غير محسوم';
+    $secondary = isset($actors[1]) ? $actors[1] : '';
+
+    // 🎯 3️⃣ استخراج الهدف
+    $target = sod_detect_target_from_text($text);
+
+    // 📊 4️⃣ حساب درجة الثقة
+    $confidence = 40; // ثقة أساسية لوجود فعل عسكري
+    
+    if (!empty($actors)) $confidence += 30; // وجود فاعل في القاموس
+    if (!empty($target)) $confidence += 15; // وجود هدف واضح
+    if (count($actors) > 1) $confidence += 10; // تأكيد متعدد
+    
+    // خصم ثقة إذا كان الفاعل غامضًا
+    if ($primary === 'فاعل غير محسوم') $confidence = 20;
+
+    if ($confidence > 95) $confidence = 95;
+
+    return [
+        'primary_actor' => $primary,
+        'secondary_actor' => $secondary,
+        'target' => $target,
+        'confidence' => $confidence,
+        'reason' => 'military-action-detected',
+        'action_type' => $action_type
+    ];
+}
+
 function sod_resolve_field($text, $bank){
     $banks = sod_get_all_banks();
     $vals = isset($banks[$bank]) ? $banks[$bank] : [];
@@ -180,12 +285,20 @@ function sod_classify_event_v3($event){
         $context_words[] = $m[1];
     }
     
+    // 🧠 استخدام Actor Engine V2 للتحليل الذكي
+    $actor_ai = sod_actor_engine_v2($text);
+    
     return [
-        'actor_v2' => sod_resolve_actor($text),
-        'target_v2' => sod_resolve_field($text, 'targets'),
-        'context_actor' => sod_resolve_field($text, 'contexts'),
+        'actor_v2' => $actor_ai['primary_actor'],
+        'target_v2' => !empty($actor_ai['target']) ? $actor_ai['target'] : sod_resolve_field($text, 'targets'),
+        'context_actor' => $actor_ai['secondary_actor'],
         'intent' => sod_resolve_field($text, 'intents'),
         'weapon_v2' => sod_resolve_field($text, 'weapons'),
+        '_ai_v2' => [
+            'confidence' => $actor_ai['confidence'],
+            'reason' => $actor_ai['reason'],
+            'action_type' => $actor_ai['action_type']
+        ],
         '_match_details' => [
             'actor_matches' => sod_match_bank($text, sod_get_all_banks()['actors'], ['context_words' => $context_words]),
             'weapon_matches' => sod_match_bank($text, sod_get_all_banks()['weapons'], ['context_words' => $context_words]),
