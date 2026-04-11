@@ -3,7 +3,7 @@
  * Plugin Name: Beiruttime OSINT Pro — نظام الرصد الاستخباراتي الموحد V17
  * Plugin URI: https://t.me/osint_lb
  * Description: V17.3 — الجيل الاحترافي الكامل مع قواميس موسعة: مركز قيادة استخباراتي [sod_command_deck]، بنوك المعلومات (أشخاص/أماكن/أسلحة/عمليات)، خوارزميات تصنيف متقدمة، رادار التهديد SVG، مخطط النشاط الساعي، رسم الكيانات والعلاقات، تتبع الساحات الساخنة، دعم كامل V11+V12+V16 في ملف واحد + 40+ فاعل عالمي + 30+ سلاح متطور.
- * Version: 17.3.0 Expanded Dictionaries + Enhanced Classification
+ * Version: 17.4.2 AutoTrain AutoEval Fixed
  * Author: Mohammad Qassem / Beirut Time
  * Author URI: https://t.me/osint_lb
  * Text Domain: beiruttime-osint-pro
@@ -13,6 +13,12 @@
  */
 
 if (!defined('ABSPATH')) exit;
+
+$sod_inc_base = __DIR__ . '/includes';
+if (is_dir($sod_inc_base)) {
+    require_once $sod_inc_base . '/classifier-service.php';
+    require_once $sod_inc_base . '/newslog-service.php';
+}
 
 
 // ===== NEW BANK-DRIVEN CLASSIFICATION ENGINE =====
@@ -175,12 +181,14 @@ function sod_detect_event_mode($text) {
         return 'defensive_alert';
     }
 
-    if (preg_match('/(مفاوضات|محادثات|لقاء|اجتماع|وفد|قمة|مؤتمر|تصريح|قال|أكد|صرح|أعلن|أفاد|رويترز|مصدر دبلوماسي|وزارة الخارجية|وقف إطلاق النار|هدنة|ترحب|نأمل|يلتقي|التقى)/ui', $text)
-        && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|اقتحام|توغل|صاروخ|صواريخ|مسيّرة|مسيرة|دبابة|ثكنة|رشقة|صلية)/ui', $text)) {
+    if (
+        preg_match('/(مفاوضات|محادثات|لقاء|اجتماع|وفد|قمة|مؤتمر|تصريح|قال|أكد|صرح|أعلن|أفاد|رويترز|مصدر دبلوماسي|وزارة الخارجية|وقف إطلاق النار|هدنة|ترحب|نأمل|يلتقي|التقى|المتحدثة باسم|المتحدث باسم|مستشار|البيت الأبيض|البيت الابيض|الحكومة الإيرانية|الخارجية الإيرانية|وزارة الصحة|وزارة الخدمة المدنية|تقرير|تحليل|صورة|صور)/ui', $text)
+        && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|اقتحام|توغل|صاروخ|صواريخ|مسيّرة|مسيرة|دبابة|ثكنة|رشقة|صلية|كمين|أغار|اعتداء إسرائيلي|تم رصد غارة|تم رصد قصف|تم رصد اقتحام|تم رصد هجوم|استهدفنا|استهدف مجاهدونا)/ui', $text)
+    ) {
         return 'political';
     }
 
-    if (preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|اقتحام|توغل|صاروخ|صواريخ|مسيّرة|مسيرة|دبابة|ثكنة|رشقة|صلية|أغار|اعتداء إسرائيلي|تم رصد غارة|تم رصد قصف|تم رصد اقتحام|تم رصد هجوم|استهدفنا|استهدف مجاهدونا)/ui', $text)) {
+    if (preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|اقتحام|توغل|صاروخ|صواريخ|مسيّرة|مسيرة|دبابة|ثكنة|رشقة|صلية|كمين|أغار|اعتداء إسرائيلي|تم رصد غارة|تم رصد قصف|تم رصد اقتحام|تم رصد هجوم|استهدفنا|استهدف مجاهدونا|إطلاق نار|استطلاع بطائرة مسيّرة)/ui', $text)) {
         return 'kinetic';
     }
 
@@ -190,15 +198,15 @@ function sod_detect_event_mode($text) {
 function sod_is_non_military_context($text) {
     $text = so_clean_text((string)$text);
 
-    if (preg_match('/(مفاوضات|محادثات|وفد|اجتماع|لقاء|قمة|مؤتمر|وزارة الخارجية|دبلوماسي|ديبلوماسي|رئيس الوزراء|الرئيس|وقف إطلاق النار|وقف اطلاق النار|هدنة|اتفاق)/ui', $text)) {
+    if (preg_match('/(مفاوضات|محادثات|وفد|اجتماع|لقاء|قمة|مؤتمر|وزارة الخارجية|دبلوماسي|ديبلوماسي|رئيس الوزراء|الرئيس|وقف إطلاق النار|وقف اطلاق النار|هدنة|اتفاق|البيت الأبيض|البيت الابيض|المتحدثة باسم|المتحدث باسم|مستشار|صورة|صور|تقرير|تحليل|تغطية خاصة|كاتب|محلل سياسي)/ui', $text)) {
         return true;
     }
 
-    if (preg_match('/(تصريح|قال|أكد|صرح|أعلن|أفاد|نقل عن|بحسب|وفق|ذكر|كشف|شجب|استنكر|أدان|رحب|حث|دعا|طالب)/ui', $text) && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|إطلاق صواريخ|إطلاق نار|توغل|اقتحام|اغتيال)/ui', $text)) {
+    if (preg_match('/(تصريح|قال|أكد|صرح|أعلن|أفاد|نقل عن|بحسب|وفق|ذكر|كشف|شجب|استنكر|أدان|رحب|حث|دعا|طالب|ينفي|يرفض|لن تتنازل|لن تتراجع)/ui', $text) && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|إطلاق صواريخ|إطلاق نار|توغل|اقتحام|اغتيال|كمين)/ui', $text)) {
         return true;
     }
 
-    if (preg_match('/(وسائل إعلام|وسائل اعلام|صحيفة|قناة|إذاعة|تحليل|تقرير إعلامي|تغطية خاصة|كاتب|محلل سياسي|رويترز|الغارديان|نيويورك تايمز|العربية)/ui', $text) && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|إطلاق صواريخ|توغل|اقتحام|اغتيال)/ui', $text)) {
+    if (preg_match('/(وسائل إعلام|وسائل اعلام|صحيفة|قناة|إذاعة|تحليل|تقرير إعلامي|تغطية خاصة|كاتب|محلل سياسي|رويترز|الغارديان|نيويورك تايمز|العربية|الميادين|الجزيرة|نتبلوكس|سي بي اس|سی‌بی‌اس)/ui', $text) && !preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|إطلاق صواريخ|توغل|اقتحام|اغتيال|كمين)/ui', $text)) {
         return true;
     }
 
@@ -266,6 +274,105 @@ function sod_detect_target_from_text($text, $targets_bank = []) {
     return '';
 }
 
+
+function sod_context_memory_get(): array {
+    $memory = get_option('sod_context_memory_patterns', []);
+    return is_array($memory) ? $memory : [];
+}
+
+function sod_context_memory_save_feedback(string $title, array $payload = []): void {
+    $title = so_clean_text($title);
+    if ($title === '') return;
+
+    $patterns = sod_context_memory_get();
+    $entry = [
+        'fingerprint' => so_build_title_fingerprint($title),
+        'title' => $title,
+        'actor_v2' => trim((string)($payload['actor_v2'] ?? '')),
+        'intel_type' => trim((string)($payload['intel_type'] ?? '')),
+        'region' => trim((string)($payload['region'] ?? '')),
+        'context_actor' => trim((string)($payload['context_actor'] ?? '')),
+        'intent' => trim((string)($payload['intent'] ?? '')),
+        'weapon_v2' => trim((string)($payload['weapon_v2'] ?? '')),
+        'saved_at' => time(),
+    ];
+
+    if ($entry['actor_v2'] === '') return;
+
+    $patterns[] = $entry;
+    if (count($patterns) > 400) {
+        $patterns = array_slice($patterns, -400);
+    }
+    update_option('sod_context_memory_patterns', $patterns, false);
+}
+
+
+
+
+
+function sod_auto_dataset_training_from_newslog(int $limit = 2500): array {
+    global $wpdb;
+    $table = $wpdb->prefix . 'so_news_events';
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT id,title,source_name,intel_type,tactical_level,region,actor_v2,weapon_v2,target_v2,context_actor,intent,score,war_data,field_data
+         FROM {$table}
+         ORDER BY id DESC
+         LIMIT %d",
+        max(100, $limit)
+    ), ARRAY_A);
+
+    if (empty($rows)) return ['scanned'=>0,'learned'=>0];
+
+    $learned = 0;
+    foreach ($rows as $row) {
+        $title = so_clean_text((string)($row['title'] ?? ''));
+        if ($title === '') continue;
+
+        $manual = sod_get_manual_override_state($row);
+        $wd = sod_parse_json_array($row['war_data'] ?? '');
+        $evaluationMode = (string)($wd['evaluation_mode'] ?? '');
+
+        $trusted = !empty($manual['enabled'])
+            || $evaluationMode === 'manual_override'
+            || ((int)($row['score'] ?? 0) >= 130 && !empty($row['actor_v2']) && (string)$row['actor_v2'] !== 'فاعل غير محسوم');
+
+        if (!$trusted) continue;
+
+        $payload = [
+            'title' => $title,
+            'actor_v2' => (string)($row['actor_v2'] ?? ''),
+            'region' => (string)($row['region'] ?? ''),
+            'intel_type' => (string)($row['intel_type'] ?? ''),
+            'tactical_level' => (string)($row['tactical_level'] ?? ''),
+            'score' => (int)($row['score'] ?? 0),
+            'target_v2' => (string)($row['target_v2'] ?? ''),
+            'context_actor' => (string)($row['context_actor'] ?? ''),
+            'intent' => (string)($row['intent'] ?? ''),
+            'weapon_v2' => (string)($row['weapon_v2'] ?? ''),
+        ];
+
+        SO_Manual_Learning::save_feedback(['title'=>$title,'source_name'=>(string)($row['source_name'] ?? '')], $payload);
+        sod_context_memory_save_feedback($title, $payload);
+
+        foreach ([['types',$payload['intel_type']],['levels',$payload['tactical_level']],['regions',$payload['region']],['actors',$payload['actor_v2']],['targets',$payload['target_v2']],['contexts',$payload['context_actor']],['intents',$payload['intent']],['weapons',$payload['weapon_v2']]] as $pair) {
+            [$bank, $value] = $pair;
+            if ($value !== '' && $value !== 'فاعل غير محسوم' && $value !== 'غير محدد') {
+                sod_add_bank_value($bank, $value);
+            }
+        }
+        $learned++;
+    }
+
+    update_option('sod_auto_dataset_training_summary', [
+        'time' => time(),
+        'scanned' => count($rows),
+        'learned' => $learned,
+    ], false);
+
+    return ['scanned'=>count($rows),'learned'=>$learned];
+}
+
+
 function sod_actor_engine_v2($text) {
     $text = so_clean_text((string)$text);
     $banks = sod_get_all_banks();
@@ -273,9 +380,15 @@ function sod_actor_engine_v2($text) {
     $mode = sod_detect_event_mode($text);
     $target = sod_detect_target_from_text($text, $banks['targets']);
 
+    $memory_hit = sod_context_memory_infer($text);
+    if (!empty($memory_hit)) {
+        return $memory_hit;
+    }
+
     if ($mode === 'defensive_alert') {
         if ($target === '') {
-            if (preg_match('/(?:في|خط(?: ?المواجهة)?[:：]?)\s*([^\.\n]{2,80})/ui', $text, $m)) {
+            if (preg_match('/(?:في|خط(?: ?المواجهة)?[:：]?)\s*([^\.
+]{2,80})/ui', $text, $m)) {
                 $target = trim((string)$m[1]);
             }
         }
@@ -289,57 +402,64 @@ function sod_actor_engine_v2($text) {
         ];
     }
 
-    if ($mode === 'political') {
-        $political_actor = 'فاعل غير محسوم';
-        $political_map = [
-            'إيران' => '/(إيران|ايران|إيراني|ايراني|طهران|عراقجي|قاليباف|الخارجية الإيرانية|التلفزيون الإيراني|تسنيم)/ui',
-            'الولايات المتحدة' => '/(الولايات المتحدة|أميركا|اميركا|أمريكا|واشنطن|ترامب|ترمب|فانس|ويتكوف|كوشنر|البيت الأبيض)/ui',
-            'باكستان' => '/(باكستان|إسلام آباد|اسلام اباد|شهباز شريف|الخارجية الباكستانية)/ui',
-            'حماس' => '/(^|\s)(حماس|حركة حماس)(\s|:|$)/ui',
-            'المقاومة الإسلامية (حزب الله)' => '/(المقاومة الإسلامية|حزب الله)/ui',
-        ];
-        foreach ($political_map as $label => $pattern) {
-            if (preg_match($pattern, $text)) {
-                $political_actor = $label;
-                break;
-            }
-        }
+    $hard_non_military = sod_is_non_military_context($text)
+        || preg_match('/(صورة\s+لل?وفد|الوفد\s+الإيراني\s+المفاوض|إعلام\s+إيراني|رويترز\s+عن\s+مصدر|مصدر\s+دبلوماسي|الجزيرة|العربية|الميادين|تغطية\s+خاصة|كاتب|محلل سياسي|نتبلوكس|وزارة الخدمة المدنية|المؤتمر الشعبي|النائب فضل الله|تاكر كارلسون|ولايتي|المتحدثة باسم الحكومة الإيرانية|البيت الأبيض|البيت الابيض|مستشار المرشد الإيراني|مستشار قائد الثورة الإسلامية)/ui', $text);
+
+    if ($mode === 'political' || $hard_non_military) {
+        $named_actor = sod_extract_named_nonmilitary_actor($text);
         return [
-            'primary_actor' => $political_actor,
+            'primary_actor' => $named_actor !== '' ? $named_actor : 'فاعل غير محسوم',
             'secondary_actor' => '',
-            'target' => $target,
-            'confidence' => $political_actor === 'فاعل غير محسوم' ? 24 : 58,
-            'reason' => 'political-or-report-context',
+            'target' => '',
+            'confidence' => $named_actor !== '' ? 88 : 96,
+            'reason' => $named_actor !== '' ? 'non-military-named-actor' : 'non-military-context',
             'actor_matches' => [],
         ];
     }
 
     $actor_matches = sod_match_bank($text, $actors_bank, ['bank' => 'actors']);
 
-    if (preg_match('/(المقاومة الإسلامية|حزب الله|مجاهدونا|استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية|دبابة ميركافا|ثكنة|مستوطنة|جنود وآليات جيش العدو)/ui', $text)) {
-        $actor_matches = ['المقاومة الإسلامية (حزب الله)' => ['score' => 99, 'keyword' => 'المقاومة الإسلامية', 'weight' => 1.5]] + $actor_matches;
-    } elseif (preg_match('/(الجيش الإسرائيلي|جيش الاحتلال|طيران الاحتلال|غارة إسرائيلية|قصف إسرائيلي|اعتداء إسرائيلي|توغل قوات الاحتلال|مستوطنون يقتحمون|الطيران الحربي المعادي|طائرات الاحتلال)/ui', $text)) {
-        $actor_matches = ['جيش العدو الإسرائيلي' => ['score' => 99, 'keyword' => 'الجيش الإسرائيلي', 'weight' => 1.5]] + $actor_matches;
+    if (preg_match('/(المقاومة الإسلامية|حزب الله|مجاهدونا|استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية|استهدفنا دبابة|استهدفنا تجمّع|ثكنة|مستوطنة|جنود وآليات جيش العدو)/ui', $text)) {
+        $actor_matches = ['المقاومة الإسلامية (حزب الله)' => ['score' => 120, 'keyword' => 'المقاومة الإسلامية', 'weight' => 1.6]] + $actor_matches;
+    }
+    if (preg_match('/(الجيش الإسرائيلي|جيش الاحتلال|قوات الاحتلال|طيران الاحتلال|غارة إسرائيلية|قصف إسرائيلي|اعتداء إسرائيلي|توغل قوات الاحتلال|مستوطنون يقتحمون|الطيران الحربي المعادي|طائرات الاحتلال|طيران العدو|العدو شن غارة|قصف طيران الاحتلال)/ui', $text)) {
+        $actor_matches = ['جيش العدو الإسرائيلي' => ['score' => 120, 'keyword' => 'الجيش الإسرائيلي', 'weight' => 1.6]] + $actor_matches;
+    }
+    if (preg_match('/(^|\s)(حماس|حركة حماس|كتائب القسام)(\s|:|$)/ui', $text)) {
+        $actor_matches = ['كتائب القسام (حماس)' => ['score' => 116, 'keyword' => 'حماس', 'weight' => 1.5]] + $actor_matches;
+    }
+    if (preg_match('/(^|\s)(سرايا القدس|الجهاد الإسلامي)(\s|:|$)/ui', $text)) {
+        $actor_matches = ['سرايا القدس (الجهاد الإسلامي)' => ['score' => 114, 'keyword' => 'سرايا القدس', 'weight' => 1.5]] + $actor_matches;
     }
 
     $actors = array_slice(array_keys($actor_matches), 0, 3);
     $primary = $actors[0] ?? 'فاعل غير محسوم';
     $secondary = $actors[1] ?? '';
 
-    if ($primary === 'فاعل غير محسوم' && preg_match('/(استهداف دبابة إسرائيلية|استهداف موقع|استهدفنا تجمعا|استهدفنا تجمّعا|ثكنة يعرا|مستوطنة نهاريا|جنود وآليات جيش العدو)/ui', $text)) {
-        $primary = 'المقاومة الإسلامية (حزب الله)';
+    if ($primary === 'فاعل غير محسوم') {
+        if (preg_match('/(استهداف دبابة إسرائيلية|استهداف موقع|استهدفنا تجمعا|استهدفنا تجمّعا|ثكنة يعرا|مستوطنة نهاريا|جنود وآليات جيش العدو)/ui', $text)) {
+            $primary = 'المقاومة الإسلامية (حزب الله)';
+        } elseif (preg_match('/(غارة إسرائيلية|طيران الاحتلال|الطيران الحربي المعادي|طائرات الاحتلال|قوات الاحتلال|مستوطنون يقتحمون)/ui', $text)) {
+            $primary = 'جيش العدو الإسرائيلي';
+        }
+    }
+
+    if (preg_match('/(إعلام|قناة|رويترز|العربية|الميادين|الجزيرة|صحيفة|تغطية|محلل|كاتب)/ui', $primary)) {
+        $primary = 'فاعل غير محسوم';
+        $secondary = '';
     }
 
     $confidence = 42;
-    if (!empty($actor_matches)) {
+    if (!empty($actor_matches) && $primary !== 'فاعل غير محسوم') {
         $top_score = (float)($actor_matches[$primary]['score'] ?? 0);
         $confidence += min(35, (int)round($top_score));
     }
     if ($target !== '') $confidence += 10;
     if ($secondary !== '') $confidence += 4;
+    if ($primary === 'فاعل غير محسوم') $confidence = min($confidence, 45);
     $confidence = max(15, min(96, $confidence));
 
-    return [
+    $result = [
         'primary_actor' => $primary,
         'secondary_actor' => $secondary,
         'target' => $target,
@@ -347,6 +467,8 @@ function sod_actor_engine_v2($text) {
         'reason' => 'kinetic-or-operational-context',
         'actor_matches' => $actor_matches,
     ];
+
+    return sod_governor_ai($result, $text);
 }
 
 function sod_resolve_actor($text){
@@ -365,7 +487,7 @@ function sod_classify_event_v3($event){
 
     $bucket = function_exists('so_detect_content_bucket') ? so_detect_content_bucket($text) : 'general';
     $mode = sod_detect_event_mode($text);
-    $actor_ai = sod_actor_engine_v2($text);
+    $actor_ai = sod_governor_ai(sod_actor_engine_v2($text), $text);
 
     $target_v2 = $actor_ai['target'] !== '' ? $actor_ai['target'] : sod_resolve_field($text, 'targets');
     $context_actor = ($bucket === 'statement' || $bucket === 'report') ? '' : sod_resolve_field($text, 'contexts');
@@ -380,16 +502,30 @@ function sod_classify_event_v3($event){
         if ($intent === '') $intent = 'هجوم';
     }
 
-    if ($bucket === 'statement' || $bucket === 'report') {
-        $actor_ai['target'] = $target_v2;
-        $actor_ai['confidence'] = min((int)($actor_ai['confidence'] ?? 20), 60);
-        $actor_ai['reason'] = 'statement-or-report-context';
+    if ($bucket === 'statement' || $bucket === 'report' || sod_is_non_military_context($text)) {
+        $named_actor = sod_extract_named_nonmilitary_actor($text);
+        if ($mode !== 'kinetic') {
+            $actor_ai['primary_actor'] = $named_actor !== '' ? $named_actor : 'فاعل غير محسوم';
+            $actor_ai['secondary_actor'] = '';
+            $actor_ai['target'] = '';
+            $actor_ai['confidence'] = $named_actor !== '' ? max((int)($actor_ai['confidence'] ?? 20), 70) : min((int)($actor_ai['confidence'] ?? 20), 35);
+            $actor_ai['reason'] = $named_actor !== '' ? 'statement-named-actor' : 'statement-or-report-context';
+        }
     }
 
+    $resolved_region = (string)sod_resolve_field($text, 'regions');
     $early_warning = sod_early_warning_ai($text, [
         'actor' => (string)($actor_ai['primary_actor'] ?? ''),
-        'region' => (string)sod_resolve_field($text, 'regions'),
+        'region' => $resolved_region,
         'intel_type' => (string)$bucket,
+    ]);
+    $prediction = sod_prediction_layer($text, [
+        'actor' => (string)($actor_ai['primary_actor'] ?? ''),
+        'region' => $resolved_region,
+        'intel_type' => (string)$bucket,
+        'target' => (string)$target_v2,
+        'weapon' => (string)$weapon_v2,
+        'early_warning' => $early_warning,
     ]);
 
     return [
@@ -404,6 +540,7 @@ function sod_classify_event_v3($event){
             'bucket' => $bucket,
         ],
         '_early_warning' => $early_warning,
+        '_prediction' => $prediction,
         '_match_details' => [
             'actor_matches' => !empty($actor_ai['actor_matches']) ? $actor_ai['actor_matches'] : sod_match_bank($text, sod_prepare_actor_bank(sod_get_all_banks()['actors']), ['context_words' => $context_words, 'bank' => 'actors']),
             'weapon_matches' => sod_match_bank($text, sod_get_all_banks()['weapons'], ['context_words' => $context_words, 'bank' => 'weapons']),
@@ -525,6 +662,7 @@ function sod_early_warning_ai($text, $context = []) {
     elseif ($score >= 30) $level = 'متوسط';
     else $level = 'منخفض';
 
+
     return [
         'level' => $level,
         'score' => $score,
@@ -538,17 +676,172 @@ function sod_early_warning_ai($text, $context = []) {
     ];
 }
 
+function sod_rule_engine_scores($text, $context = []) {
+    $text = so_clean_text((string)$text);
+    $scores = [
+        'attack' => 0,
+        'defensive' => 0,
+        'political' => 0,
+        'media' => 0,
+        'logistics' => 0,
+    ];
+
+    $rules = [
+        'attack' => [
+            '/(غارة|قصف|استهداف|هجوم|اشتباك|توغل|اقتحام|إطلاق صواريخ|صلية صاروخية|اغتيال|تفجير|قصف مدفعي|إطلاق نار من دبابات|استهداف دبابة|ثكنة|موقع عسكري)/ui' => 26,
+            '/(مسيّرة|مسيرة|صاروخ|صاروخي|مضاد للدروع|ميركافا|محلّقة انقضاضية)/ui' => 18,
+            '/(الجيش الإسرائيلي|طيران العدو|طائرات الاحتلال|قوات الاحتلال|المقاومة الإسلامية|حزب الله|استهدفنا|استهدف مجاهدونا)/ui' => 20,
+        ],
+        'defensive' => [
+            '/(انذار|إنذار|صفارات|صافرات|الجبهة الداخلية|تسوفار|خطالمواجهة|خط المواجهة|لقد انتهى الحدث|تسلل طائرة بدون طيار|اعتراض)/ui' => 26,
+            '/(انذار احمر|إنذار أحمر|رفع الإنذار|زوال الخطر|خشية تسلل)/ui' => 16,
+        ],
+        'political' => [
+            '/(مفاوضات|محادثات|وفد|اجتماع|لقاء|وزارة|وزير|الرئيس|رئيس الوزراء|الخارجية|هدنة|وقف إطلاق النار|مصدر دبلوماسي)/ui' => 24,
+            '/(رويترز|تسنيم|أكد|قال|أعلن|أفاد|أوضح|رحب|طالب|ندد|استنكر)/ui' => 12,
+        ],
+        'media' => [
+            '/(تقرير|تحليل|تغطية خاصة|برنامج|مقابلة|مراسل|وسائل إعلام|صحيفة|وكالة|الكاتب والمحلل السياسي)/ui' => 22,
+            '/(إعلام إيراني|إعلام العدو|القناة 12|فوكس نيوز|بلومبرغ|واشنطن بوست|الغارديان)/ui' => 12,
+        ],
+        'logistics' => [
+            '/(مضيق هرمز|الملاحة|الموانئ|الوقود|الغاز|النفط|إمدادات|ناقلة|ناقلات|شحن|بنوك أجنبية|أصول مجمدة)/ui' => 18,
+        ],
+    ];
+
+    foreach ($rules as $type => $patterns) {
+        foreach ($patterns as $pattern => $points) {
+            if (preg_match($pattern, $text)) {
+                $scores[$type] += $points;
+            }
+        }
+    }
+
+    $actor = trim((string)($context['actor'] ?? ''));
+    $region = trim((string)($context['region'] ?? ''));
+    $intel_type = trim((string)($context['intel_type'] ?? ''));
+    if ($actor !== '' && !in_array($actor, ['فاعل غير محسوم', 'جهة غير معلنة', 'غير محدد'], true)) {
+        if (mb_stripos($actor, 'الإنذار') !== false) $scores['defensive'] += 12;
+        elseif (preg_match('/(حزب الله|المقاومة|جيش العدو الإسرائيلي)/ui', $actor)) $scores['attack'] += 14;
+    }
+    if ($region !== '' && $region !== 'غير محدد') {
+        $scores['attack'] += 4;
+        $scores['defensive'] += 4;
+    }
+    if (in_array($intel_type, ['عسكري/أمني', 'أمني', 'رصد/إنذار'], true)) $scores['attack'] += 10;
+    if ($intel_type === 'سياسي') $scores['political'] += 12;
+    if ($intel_type === 'إعلامي') $scores['media'] += 12;
+
+    arsort($scores);
+    return $scores;
+}
+
+function sod_confidence_system($scores, $boost = 0) {
+    $vals = array_values((array)$scores);
+    $top = (int)($vals[0] ?? 0);
+    $second = (int)($vals[1] ?? 0);
+    $gap = max(0, $top - $second);
+
+    $confidence = 35;
+    if ($top >= 70) $confidence = 92;
+    elseif ($top >= 50) $confidence = 82;
+    elseif ($top >= 35) $confidence = 72;
+    elseif ($top >= 20) $confidence = 58;
+
+    if ($gap >= 18) $confidence += 8;
+    elseif ($gap <= 6) $confidence -= 12;
+
+    $confidence += (int)$boost;
+    return max(20, min(97, $confidence));
+}
+
+function sod_prediction_layer($text, $context = []) {
+    $text = so_clean_text((string)$text);
+    $scores = sod_rule_engine_scores($text, $context);
+    $mode = array_key_first($scores);
+    $early = (isset($context['early_warning']) && is_array($context['early_warning'])) ? $context['early_warning'] : [];
+    $confidence = sod_confidence_system($scores, (int)($early['confidence'] ?? 0) / 10);
+    $risk = max((int)($early['score'] ?? 0), (int)($scores[$mode] ?? 0));
+    $window = (int)($early['window_hours'] ?? 12);
+    $actor = trim((string)($context['actor'] ?? 'فاعل غير محسوم')) ?: 'فاعل غير محسوم';
+    $region = trim((string)($context['region'] ?? 'غير محدد')) ?: 'غير محدد';
+    $target = trim((string)($context['target'] ?? ''));
+    $weapon = trim((string)($context['weapon'] ?? ''));
+    $scenario = 'مراقبة اعتيادية';
+    $next_step = 'استمرار المراقبة';
+    $direction = (string)($early['direction'] ?? 'مستقر/غير محسوم');
+
+    if ($mode === 'attack') {
+        $scenario = 'احتمال استمرار الضربات أو الرد المقابل خلال نافذة قصيرة';
+        $next_step = 'تعزيز المراقبة التكتيكية ومقارنة النمط بآخر 6–12 ساعة';
+        $window = min($window, 6);
+        if ($weapon !== '') $scenario .= ' باستخدام ' . $weapon;
+    } elseif ($mode === 'defensive') {
+        $scenario = 'المرجح تجدّد الإنذار أو انتقاله إلى اعتراض/رشقة محدودة';
+        $next_step = 'مراقبة صفارات الإنذار وتقاطعات الرصد مع إطلاقات فعلية';
+        $window = min($window, 3);
+    } elseif ($mode === 'political') {
+        $scenario = 'المشهد سياسي/تفاوضي؛ الخطر المباشر أقل ما لم تظهر لغة تهديد أو تحضير ميداني';
+        $next_step = 'تخفيض وزن الفاعل العسكري ومراقبة أي انتقال إلى لهجة تهديد أو حشد';
+        $window = max($window, 12);
+        $actor = 'فاعل غير محسوم';
+    } elseif ($mode === 'media') {
+        $scenario = 'الخبر إعلامي/تفسيري؛ لا توجد دلالة كافية على فعل وشيك دون مؤشرات مساندة';
+        $next_step = 'عدم ترقية الخبر إلى تهديد إلا إذا ترافق مع إنذار أو فعل ميداني';
+        $window = max($window, 12);
+        $actor = 'فاعل غير محسوم';
+    } elseif ($mode === 'logistics') {
+        $scenario = 'مؤشر لوجستي/اقتصادي قد يسبق ضغطاً سياسياً أو تصعيداً على المدى المتوسط';
+        $next_step = 'ربط الحدث بمؤشرات الملاحة والإمداد والأسواق قبل رفع الإنذار';
+        $window = max($window, 12);
+    }
+
+    if (preg_match('/(تهديد|توعد|الرد قادم|لن نسمح|سندفع الثمن|خط أحمر)/ui', $text)) {
+        $risk = min(100, $risk + 12);
+        $confidence = min(97, $confidence + 6);
+        $scenario .= ' مع لهجة تهديد واضحة';
+    }
+
+    if (preg_match('/(حشد|تعزيزات|رفع الجهوزية|استنفار|إخلاء|فتح الملاجئ)/ui', $text)) {
+        $risk = min(100, $risk + 10);
+        $window = min($window, 6);
+        $next_step = 'رفع أولوية الإنذار لأن الخبر يجمع بين تحضير وإشارة تصعيد';
+    }
+
+    if ($risk >= 80) $level = 'حرج';
+    elseif ($risk >= 60) $level = 'مرتفع';
+    elseif ($risk >= 35) $level = 'متوسط';
+    else $level = 'منخفض';
+
+    return [
+        'mode' => (string)$mode,
+        'confidence' => (int)$confidence,
+        'risk_score' => (int)$risk,
+        'risk_level' => $level,
+        'expected_window_hours' => (int)$window,
+        'expected_window_label' => sod_early_warning_normalize_window($window),
+        'predicted_actor' => $actor,
+        'predicted_region' => $region,
+        'predicted_target' => $target,
+        'predicted_weapon' => $weapon,
+        'direction' => $direction,
+        'scenario' => $scenario,
+        'next_step' => $next_step,
+        'rule_scores' => $scores,
+    ];
+}
+
 
 // ==========================================================================
 // 1. الثوابت الموحدة — Unified Constants
 // ==========================================================================
-define('SO_VERSION',          '17.3.0');
+define('SO_VERSION',          '17.3.1');
 define('SO_PLUGIN_DIR',       plugin_dir_path(__FILE__));
 define('SO_PLUGIN_URL',       plugin_dir_url(__FILE__));
 define('SO_TELEGRAM_LINK',    'https://t.me/osint_lb');
 define('SO_SYNC_LOCK_TTL',    120);
 
-define('SOD_VERSION',         '17.3.0');
+define('SOD_VERSION',         '17.3.1');
 define('SOD_PLUGIN_DIR',      plugin_dir_path(__FILE__));
 define('SOD_PLUGIN_URL',      plugin_dir_url(__FILE__));
 define('SOD_TG_LINK',         'https://t.me/osint_lb');
@@ -841,120 +1134,112 @@ function so_reanalyze_all_news_events($limit = 3000, $offset = 0) {
     global $wpdb;
     $table = $wpdb->prefix . 'so_news_events';
     $rows = $wpdb->get_results($wpdb->prepare(
-        "SELECT id, title, source_name, region, actor_v2, intel_type, score, event_timestamp, war_data, field_data
-         FROM {$table}
+        "SELECT * FROM {$table}
          ORDER BY id DESC
          LIMIT %d OFFSET %d",
         (int)$limit,
         (int)$offset
     ), ARRAY_A);
 
-    if (empty($rows)) return ['updated' => 0, 'scanned' => 0, 'next_offset' => $offset, 'done' => true];
+    if (empty($rows)) return ['updated' => 0, 'scanned' => 0, 'next_offset' => $offset, 'total' => 0, 'done' => true];
 
     $updated = 0;
+    $locked = 0;
     foreach ($rows as $row) {
         $title = (string)($row['title'] ?? '');
-        $source_name = (string)($row['source_name'] ?? '');
         if ($title === '') continue;
 
-        if (function_exists('so_bt_analyze_news_v2')) {
-            $legacy = so_bt_analyze_news_v2($title, $source_name);
-            if (!is_array($legacy) || !empty($legacy['ignored'])) continue;
-        } else {
-            $legacy = [];
+        if (sod_is_manual_locked_row($row)) {
+            $update = sod_mark_evaluation_state($row, [
+                'war_data' => (string)($row['war_data'] ?? '{}'),
+                'field_data' => (string)($row['field_data'] ?? '{}'),
+            ], 'manual_override');
+            sod_db_safe_update($table, $update, ['id' => (int)$row['id']]);
+            $locked++;
+            continue;
         }
 
-        $stable_region = function_exists('so_bt_detect_region_v3_patch') ? so_bt_detect_region_v3_patch($title, so_bt_detect_region_v2($title)) : (trim((string)($row['region'] ?? '')) ?: 'غير محدد');
-        $multi = so_multi_actor_analysis($title, $source_name, $stable_region);
-        $primary = trim((string)($multi['primary_actor'] ?? 'فاعل غير محسوم'));
+        $item = [
+            'title'      => (string)($row['title'] ?? ''),
+            'link'       => (string)($row['link'] ?? ''),
+            'source'     => (string)($row['source_name'] ?? $row['source'] ?? ''),
+            'color'      => (string)($row['source_color'] ?? '#1da1f2'),
+            'date'       => (string)($row['event_timestamp'] ?? ''),
+            'agency_loc' => (string)($row['agency_loc'] ?? ''),
+            'image_url'  => (string)($row['image_url'] ?? ''),
+            'content'    => (string)($row['content'] ?? ''),
+        ];
 
-        $new_region = trim((string)($stable_region ?: 'غير محدد'));
-        $new_actor  = $primary !== '' ? $primary : 'فاعل غير محسوم';
-        $new_intel  = trim((string)($multi['event_type'] ?? ($legacy['classification'] ?? 'عام')));
-        if ($new_intel === '') $new_intel = 'عام';
+        $analyzed = SO_OSINT_Engine::process_event($item);
+        if (!$analyzed || !is_array($analyzed)) continue;
 
-        $new_score  = (int) so_advanced_score([
-            'title' => $title,
-            'actor' => $new_actor,
-            'region' => $new_region,
-            'type' => $new_intel,
-            'actor_conf' => (int)($multi['confidence']['primary'] ?? 0),
-            'type_conf' => 60,
-            'region_conf' => $new_region !== 'غير محدد' ? 70 : 20,
-        ]);
+        $analyzed = SO_Manual_Learning::apply_to_analyzed($item, $analyzed);
+        $wd = sod_parse_json_array($analyzed['war_data'] ?? '{}');
+        $target_v2 = (string)($wd['target'] ?? ($analyzed['target_v2'] ?? ''));
+        $context_actor = (string)($wd['context_actor'] ?? ($analyzed['context_actor'] ?? ''));
+        $intent = (string)($wd['intent'] ?? ($analyzed['intent'] ?? ''));
+        $weapon_v2 = (string)($wd['weapon_means'] ?? ($analyzed['weapon_v2'] ?? ''));
 
-        $updates = [
-            'region' => $new_region,
-            'actor_v2' => $new_actor,
-            'intel_type' => $new_intel,
-            'score' => $new_score,
+        $update_payload = [
             'title_fingerprint' => function_exists('so_build_title_fingerprint') ? so_build_title_fingerprint($title) : md5($title),
+            'intel_type'     => (string)($analyzed['intel_type'] ?? ($row['intel_type'] ?? '')),
+            'tactical_level' => (string)($analyzed['tactical_level'] ?? ($row['tactical_level'] ?? '')),
+            'region'         => (string)($analyzed['region'] ?? ($row['region'] ?? '')),
+            'actor_v2'       => (string)($analyzed['actor_v2'] ?? ($row['actor_v2'] ?? 'فاعل غير محسوم')),
+            'score'          => (int)($analyzed['score'] ?? ($row['score'] ?? 0)),
+            'war_data'       => (string)($analyzed['war_data'] ?? '{}'),
+            'field_data'     => (string)($analyzed['field_data'] ?? '{}'),
+            'target_v2'      => $target_v2,
+            'context_actor'  => $context_actor,
+            'intent'         => $intent,
+            'weapon_v2'      => $weapon_v2,
         ];
-
-        $war_data = [];
-        if (!empty($row['war_data'])) {
-            $decoded = json_decode((string)$row['war_data'], true);
-            if (is_array($decoded)) $war_data = $decoded;
+        $update_payload = sod_mark_evaluation_state($row, $update_payload, 'auto');
+        $res = sod_db_safe_update($table, $update_payload, ['id' => (int)$row['id']]);
+        if (!empty($res['ok'])) {
+            $updated++;
+            foreach ([['types',$update_payload['intel_type']],['levels',$update_payload['tactical_level']],['regions',$update_payload['region']],['actors',$update_payload['actor_v2']],['targets',$target_v2],['contexts',$context_actor],['intents',$intent],['weapons',$weapon_v2]] as $pair) {
+                [$bk,$val] = $pair;
+                if ($val !== '' && $val !== 'فاعل غير محسوم' && $val !== 'غير محدد') sod_add_bank_value($bk, $val);
+            }
         }
-        $war_data['reanalyzed_at'] = time();
-        $war_data['reanalyzed_region'] = $new_region;
-        $war_data['core_engine'] = 'multi_actor_v31';
-        $war_data['reanalyzed_actor'] = $new_actor;
-        $war_data['reanalyzed_type'] = $new_intel;
-        $war_data['primary_actor'] = $multi['primary_actor'] ?? '';
-        $war_data['secondary_actor'] = $multi['secondary_actor'] ?? '';
-        $war_data['target'] = $multi['target'] ?? '';
-        $war_data['context_actor'] = $multi['context_actor'] ?? '';
-        $war_data['intent'] = $multi['intent'] ?? '';
-
-        $field_data = [];
-        if (!empty($row['field_data'])) {
-            $decoded = json_decode((string)$row['field_data'], true);
-            if (is_array($decoded)) $field_data = $decoded;
-        }
-        $field_data['multi_actor'] = $multi;
-        $field_data['reanalysis'] = [
-            'time' => time(),
-            'source_name' => $source_name,
-            'engine' => 'multi_actor_v31',
-        ];
-
-        $updates['war_data'] = wp_json_encode($war_data, JSON_UNESCAPED_UNICODE);
-        $updates['field_data'] = wp_json_encode($field_data, JSON_UNESCAPED_UNICODE);
-
-        $wpdb->update($table, $updates, ['id' => (int)$row['id']]);
-        $updated++;
     }
 
     $next_offset = $offset + count($rows);
     $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
     $done = $next_offset >= $total;
 
+    $train = sod_auto_dataset_training_from_newslog(min(2500, max(400, (int)$limit)));
+
     update_option('so_last_reanalysis_summary', [
         'time' => time(),
         'updated' => (int)$updated,
+        'locked' => (int)$locked,
         'scanned' => (int)count($rows),
         'limit' => (int)$limit,
         'offset' => (int)$offset,
         'next_offset' => (int)$next_offset,
         'total' => (int)$total,
         'done' => (bool)$done,
-        'engine' => 'multi_actor_v31',
+        'engine' => 'sod_auto_eval_v17_4_2',
+        'training' => $train,
     ], false);
 
     return [
         'updated' => (int)$updated,
+        'locked' => (int)$locked,
         'scanned' => (int)count($rows),
         'next_offset' => (int)$next_offset,
         'total' => (int)$total,
         'done' => (bool)$done,
+        'training' => $train,
     ];
 }
 
 function so_reanalyze_all_news_events_full($batch = 1000, $reset = false) {
     global $wpdb;
     $table = $wpdb->prefix . 'so_news_events';
-    $batch = max(100, (int)$batch);
+    $batch = max(50, (int)$batch);
 
     if ($reset) {
         update_option('so_reanalyze_cursor', 0, false);
@@ -1217,6 +1502,24 @@ function so_bt_detect_actor_v2($title, $source_name = '') {
     $source_name = trim((string)$source_name);
     $t = so_clean_text($title . ' ' . $source_name);
     $region = so_bt_detect_region_v3_patch($title, so_bt_detect_region_v2($title));
+    $named_nonmilitary = sod_extract_named_nonmilitary_actor($t);
+    $has_attack_markers = preg_match('/(غارة|غارات|قصف|استهداف|استهدفت|عدوان|اشتباك|توغل|اقتحام|صاروخ|صواريخ|طيران حربي|الطيران الحربي|مسيرة|مسيّرة|هجوم|اغتيال|إطلاق نار|استطلاع بطائرة مسيّرة|تم رصد)/ui', $title) === 1;
+
+    if (sod_is_non_military_context($t) && !$has_attack_markers) {
+        if ($named_nonmilitary !== '') {
+            return $named_nonmilitary;
+        }
+        if (preg_match('/(إيران|ايران|طهران)/ui', $title)) {
+            return 'إيران';
+        }
+        if (preg_match('/(الولايات المتحدة|أمريكا|امريكا|واشنطن|البيت الأبيض|ترامب|ترمب)/ui', $title)) {
+            return 'الولايات المتحدة';
+        }
+        if (preg_match('/(باكستان|إسلام آباد|اسلام آباد)/ui', $title)) {
+            return 'باكستان';
+        }
+        return 'فاعل غير محسوم';
+    }
 
     // بيانات إعلام العدو / الصفارات
     if (preg_match('/(صفارات(?: الإنذار)?|صافرات(?: الإنذار)?|إنذار|انذار|الجبهة الداخلية|خشية تسلل)/ui', $title)) {
@@ -1271,7 +1574,7 @@ function so_bt_detect_actor_v2($title, $source_name = '') {
         if (preg_match('/(باكستان|إسلام آباد)/ui', $title)) {
             return 'باكستان';
         }
-        return 'فاعل سياقي غير مباشر';
+        return $named_nonmilitary !== '' ? $named_nonmilitary : 'فاعل غير محسوم';
     }
     
     // إيران العسكرية (الحرس الثوري)
@@ -1279,7 +1582,7 @@ function so_bt_detect_actor_v2($title, $source_name = '') {
         return 'الحرس الثوري الإيراني';
     }
 
-    return 'فاعل سياقي غير مباشر';
+    return $named_nonmilitary !== '' ? $named_nonmilitary : 'فاعل غير محسوم';
 }
 
 function so_bt_score_news_v2($title, $classification, $actor, $region, $source_name = '') {
@@ -2546,6 +2849,14 @@ class SO_OSINT_Engine {
         }
 
         $entities = self::extract_entities($lower);
+        $semantic = sod_classify_event_v3([
+            'title' => $title,
+            'content' => (string)($item['content'] ?? ''),
+        ]);
+        $semantic_target = trim((string)($semantic['target_v2'] ?? ''));
+        $semantic_context = trim((string)($semantic['context_actor'] ?? ''));
+        $semantic_intent = trim((string)($semantic['intent'] ?? ''));
+        $semantic_weapon = trim((string)($semantic['weapon_v2'] ?? ''));
 
         $momentum = 1.0;
         $sentiment = ['u_score'=>0,'e_score'=>0,'d_score'=>0,'stance'=>'محايد'];
@@ -2630,11 +2941,29 @@ class SO_OSINT_Engine {
             'intel_type' => $strategic_axis,
         ]);
 
+        $resolved_target = $semantic_target !== '' ? $semantic_target : so_build_smart_target($title, $region, $entities['targets'], $precision_5w1h['where_target']??'');
+        $resolved_context = $semantic_context;
+        $resolved_intent = $semantic_intent;
+        $resolved_weapon = $semantic_weapon !== '' ? $semantic_weapon : (!empty($entities['weapons']) ? implode(', ', array_unique($entities['weapons'])) : $precision_5w1h['how_weapon']);
+
+        if ($resolved_context === '' && !empty($semantic['_ai_v2']['bucket']) && in_array((string)$semantic['_ai_v2']['bucket'], ['statement','report'], true)) {
+            $resolved_context = 'سياق تصريحي/إعلامي';
+        }
+        if ($resolved_intent === '' && $strategic_axis === 'سياسي') {
+            $resolved_intent = 'تموضع/رسائل سياسية';
+        } elseif ($resolved_intent === '' && $strategic_axis === 'إعلامي') {
+            $resolved_intent = 'تغطية/رسائل إعلامية';
+        } elseif ($resolved_intent === '' && in_array($strategic_axis, ['عسكري/أمني','تكتيكي/ميداني','رصد/إنذار'], true)) {
+            $resolved_intent = 'نشاط ميداني';
+        }
+
         $war_data = wp_json_encode([
             'who'=>$precision_5w1h['who_primary'],'what'=>$precision_5w1h['what_type'],'where'=>$precision_5w1h['where_summary'],'when'=>$precision_5w1h['when_event'],'how'=>$precision_5w1h['how_method'],'why'=>$precision_5w1h['why_reason'],
             'action'=>!empty($entities['actions'])?implode(', ',array_unique($entities['actions'])):$precision_5w1h['what_type'],
-            'weapon_means'=>!empty($entities['weapons'])?implode(', ',array_unique($entities['weapons'])):$precision_5w1h['how_weapon'],
-            'target'=>so_build_smart_target($title, $region, $entities['targets'], $precision_5w1h['where_target']??''),
+            'weapon_means'=>$resolved_weapon,
+            'target'=>$resolved_target,
+            'context_actor'=>$resolved_context,
+            'intent'=>$resolved_intent,
             'strategic_main'=>$strategic_axis,
             'contextual_war_engine'=>['strategic_frame'=>so_detect_strategic_frame($title),'conflict_context'=>so_detect_conflict_context($title),'war_direction'=>so_detect_war_direction($title)],
             'actor'=>$precision_5w1h['who_primary'],'confidence'=>$precision_5w1h['confidence_overall'].'%',
@@ -2648,6 +2977,7 @@ class SO_OSINT_Engine {
             'source_name'=>$item['source']??'','source_color'=>$item['color']??'#1da1f2',
             'event_timestamp'=>(int)($item['date']??time()),'agency_loc'=>$item['agency_loc']??'',
             'region'=>$region,'actor_v2'=>$actor,'score'=>$final_score,'tactical_level'=>$tactical_level,
+            'target_v2'=>$resolved_target,'context_actor'=>$resolved_context,'intent'=>$resolved_intent,'weapon_v2'=>$resolved_weapon,
             'intel_type'=>$strategic_axis,'strategic_frame'=>so_detect_strategic_frame($title),
             'conflict_context'=>so_detect_conflict_context($title),'war_direction'=>so_detect_war_direction($title),
             'sentiment_score'=>0,'war_data'=>$war_data,'image_url'=>$item['image_url']??'',
@@ -2661,7 +2991,11 @@ class SO_OSINT_Engine {
                 'fusion_type_conf'=>(int)($fusion['type_conf']??0),
                 'fusion_region_conf'=>(int)($fusion['region_conf']??0),
                 'fusion_engine'=>'advanced_v2',
-                'early_warning'=>$early_warning
+                'early_warning'=>$early_warning,
+                'semantic_context_actor'=>$resolved_context,
+                'semantic_intent'=>$resolved_intent,
+                'semantic_target'=>$resolved_target,
+                'semantic_weapon'=>$resolved_weapon
             ],JSON_UNESCAPED_UNICODE),
             'llm_verified'=>$llm_verified,
         ];
@@ -2804,6 +3138,9 @@ class SO_Manual_Learning {
         ];
         if (!empty($payload['_early_warning']) && is_array($payload['_early_warning'])) {
             $corrected_war_data['early_warning'] = $payload['_early_warning'];
+            if (!empty($payload['_prediction']) && is_array($payload['_prediction'])) {
+                $corrected_war_data['prediction_layer'] = $payload['_prediction'];
+            }
         }
 
         $row = [
@@ -3304,7 +3641,7 @@ function sod_ajax_dashboard_data(): void {
     $hours=(int)($_POST['hours']??24); $region=sanitize_text_field(wp_unslash($_POST['region']??'all')); $min_score=max(0,(int)($_POST['min_score']??0));
     $events=sod_get_events(['hours'=>max(1,min(8760,$hours)),'region'=>$region,'min_score'=>$min_score,'limit'=>2000]);
     $analytics=sod_build_analytics($events);
-    $safe_events=array_map(function($ev){return['id'=>(int)$ev['id'],'title'=>wp_strip_all_tags((string)$ev['title']),'link'=>esc_url_raw((string)($ev['link']??SOD_TG_LINK)),'source_name'=>sanitize_text_field((string)$ev['source_name']),'source_color'=>sanitize_hex_color((string)($ev['source_color']??'#1da1f2'))?:'#1da1f2','intel_type'=>sanitize_text_field((string)$ev['intel_type']),'tactical_level'=>sanitize_text_field((string)$ev['tactical_level']),'region'=>sanitize_text_field((string)$ev['region']),'actor_v2'=>sanitize_text_field((string)$ev['actor_v2']),'score'=>(int)$ev['score'],'event_timestamp'=>(int)$ev['event_timestamp'],'image_url'=>esc_url_raw((string)($ev['image_url']??'')),'llm_verified'=>(bool)$ev['llm_verified'],'war_data'=>$ev['war_data']??'{}','field_data'=>$ev['field_data']??'{}'];},array_slice($events,0,500));
+    $safe_events=array_map(function($ev){$wd=sod_parse_json_array($ev['war_data']??'{}');return['id'=>(int)$ev['id'],'title'=>wp_strip_all_tags((string)$ev['title']),'link'=>esc_url_raw((string)($ev['link']??SOD_TG_LINK)),'source_name'=>sanitize_text_field((string)$ev['source_name']),'source_color'=>sanitize_hex_color((string)($ev['source_color']??'#1da1f2'))?:'#1da1f2','intel_type'=>sanitize_text_field((string)$ev['intel_type']),'tactical_level'=>sanitize_text_field((string)$ev['tactical_level']),'region'=>sanitize_text_field((string)$ev['region']),'actor_v2'=>sanitize_text_field((string)$ev['actor_v2']),'score'=>(int)$ev['score'],'event_timestamp'=>(int)$ev['event_timestamp'],'image_url'=>esc_url_raw((string)($ev['image_url']??'')),'llm_verified'=>(bool)$ev['llm_verified'],'evaluation_mode'=>(string)($wd['evaluation_mode']??'auto'),'evaluation_label'=>(string)($wd['evaluation_label']??'آلي'),'has_manual_override'=>!empty(($wd['manual_override']['enabled']??false)),'war_data'=>$ev['war_data']??'{}','field_data'=>$ev['field_data']??'{}'];},array_slice($events,0,500));
     wp_send_json_success(['events'=>$safe_events,'analytics'=>$analytics,'time'=>time()]);
 }
 
@@ -3380,6 +3717,7 @@ add_action('wp_ajax_sod_newslog_bulk',        'sod_ajax_newslog_bulk');
 add_action('wp_ajax_sod_newslog_get_banks',   'sod_ajax_newslog_get_banks');
 add_action('wp_ajax_sod_newslog_add_to_bank', 'sod_ajax_newslog_add_to_bank');
 add_action('wp_ajax_sod_newslog_remove_from_bank', 'sod_ajax_newslog_remove_from_bank');
+add_action('wp_ajax_sod_newslog_autotrain', 'sod_ajax_newslog_autotrain');
 
 
 
@@ -3409,9 +3747,18 @@ function sod_get_visible_learning_banks_defaults(): array {
     return [
         'actors'  => [
             'المقاومة الإسلامية (حزب الله)',
+            'كتائب حزب الله',
+            'كتائب القسام (حماس)',
+            'سرايا القدس (الجهاد الإسلامي)',
             'الجيش اللبناني',
             'جيش العدو الإسرائيلي',
             'الحرس الثوري الإيراني',
+            'حرس الثورة الإسلامية',
+            'الخارجية الإيرانية',
+            'الحكومة الإيرانية',
+            'البيت الأبيض',
+            'المؤتمر الشعبي اللبناني',
+            'علي أكبر ولايتي',
             'الجيش الإيراني',
             'الجيش السوري',
             'الحشد الشعبي',
@@ -3422,9 +3769,9 @@ function sod_get_visible_learning_banks_defaults(): array {
             'الجيش الروسي',
             'الجيش الأوكراني',
         ],
-        'types'   => ['العسكري والأمني','تكتيكي/ميداني','الدبلوماسي والسياسي','الاقتصادي واللوجستي','السيبراني والتقني','البرنامج النووي وأسلحة الدمار','الإعلامي والمعلوماتي','عام','سياسي','إعلامي','اقتصادي/لوجستي'],
+        'types'   => ['العسكري والأمني','تكتيكي/ميداني','الدبلوماسي والسياسي','الاقتصادي واللوجستي','السيبراني والتقني','البرنامج النووي وأسلحة الدمار','الإعلامي والمعلوماتي','عام','سياسي','إعلامي','اقتصادي/لوجستي','عسكري/أمني','أمني'],
         'levels'  => ['تكتيكي','عملياتي','استراتيجي','سياسي'],
-        'regions' => ['لبنان','سوريا','فلسطين','الأراضي المحتلة (إسرائيل)','إيران','العراق','اليمن','الخليج','الولايات المتحدة','غير محدد'],
+        'regions' => ['لبنان','سوريا','فلسطين','الأراضي المحتلة (إسرائيل)','إيران','العراق','اليمن','الخليج','الولايات المتحدة','ساحة غرب اسيا','باكستان','غير محدد'],
         'targets' => [
             'قواعد عسكرية',
             'مواقع رادار',
@@ -3444,6 +3791,10 @@ function sod_get_visible_learning_banks_defaults(): array {
             'رسالة ردع',
             'حرب إلكترونية',
             'عمل مشترك',
+            'بيان سياسي',
+            'تغطية/رسائل إعلامية',
+            'مصادر غير موثوقة',
+            'إعلام العدو',
         ],
         'intents' => [
             'هجوم',
@@ -3453,15 +3804,24 @@ function sod_get_visible_learning_banks_defaults(): array {
             'تحذير',
             'استطلاع',
             'تدريب',
+            'حرب نفسية',
+            'نشاط ميداني',
+            'تأييد',
         ],
         'weapons' => [
             'مسيرة',
+            'مسيرة هجومية',
+            'طائرات مسيرة',
             'صاروخ باليستي',
             'صاروخ كروز',
             'صاروخ / قذائف',
             'مدفعية',
             'دبابات / آليات',
+            'أسلحة رشاشة / متوسطة',
             'طيران حربي',
+            'بيان صحفي',
+            'تسريب',
+            'اعلامي',
             'دفاعات جوية',
             'زوارق حربية',
             'سلاح إلكتروني',
@@ -3621,33 +3981,6 @@ function sod_remove_bank_value(string $key, string $value): array {
     return sod_get_visible_learning_banks();
 }
 
-function sod_force_requested_actor_rule(string $actor, string $region, string $title = ''): string {
-    $actor = trim((string)$actor);
-    $region = trim((string)$region);
-    $title = so_clean_text((string)$title);
-
-    if ($actor === 'منظومة الإنذار / الجبهة الداخلية') {
-        return $actor;
-    }
-
-    if (preg_match('/(لقد انتهى الحدث|انتهى الحدث|انذار احمر|إنذار أحمر|صفارات الإنذار|صافرات الإنذار|الجبهة الداخلية|تسوفار)/ui', $title)) {
-        return 'منظومة الإنذار / الجبهة الداخلية';
-    }
-
-    if (preg_match('/(المقاومة الإسلامية|حزب الله|استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية)/ui', $title)) {
-        return 'المقاومة الإسلامية (حزب الله)';
-    }
-
-    if (preg_match('/(الجيش الإسرائيلي|جيش الاحتلال|غارة إسرائيلية|قصف إسرائيلي|اعتداء إسرائيلي|طيران الاحتلال|الطيران الحربي المعادي|طائرات الاحتلال)/ui', $title)) {
-        return 'جيش العدو الإسرائيلي';
-    }
-
-    if (in_array($actor, ['', 'غير محدد', 'عام/مجهول', 'فاعل غير محسوم'], true)) {
-        return 'فاعل غير محسوم';
-    }
-
-    return $actor;
-}
 
 
 function sod_db_table_columns(string $table): array {
@@ -3740,309 +4073,6 @@ add_action('admin_init', function() {
     }
 });
 
-function sod_ajax_newslog_search(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_search', 'nonce');
-    global $wpdb;
-    $table   = $wpdb->prefix . 'so_news_events';
-    $lrn_tbl = $wpdb->prefix . 'so_manual_learning';
-    $q        = sanitize_text_field(wp_unslash($_POST['q'] ?? ''));
-    $region   = sanitize_text_field(wp_unslash($_POST['region'] ?? ''));
-    $actor    = sanitize_text_field(wp_unslash($_POST['actor'] ?? ''));
-    $type     = sanitize_text_field(wp_unslash($_POST['intel_type'] ?? ''));
-    $score    = (int)($_POST['score'] ?? 0);
-    $page     = max(1, (int)($_POST['page'] ?? 1));
-    $per      = min(200, max(10, (int)($_POST['per_page'] ?? 25)));
-    $offset   = ($page - 1) * $per;
-
-    $where = ['1=1']; $params = [];
-    if ($q) { $where[] = 'title LIKE %s'; $params[] = '%' . $wpdb->esc_like($q) . '%'; }
-    if ($region) { $where[] = 'region = %s'; $params[] = $region; }
-    if ($actor)  { $where[] = 'actor_v2 = %s'; $params[] = $actor; }
-    if ($type)   { $where[] = 'intel_type = %s'; $params[] = $type; }
-    if ($score > 0) { $where[] = 'score >= %d'; $params[] = $score; }
-
-    $clause = implode(' AND ', $where);
-    $count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$clause}";
-    $data_sql  = "SELECT id,title,link,source_name,source_color,intel_type,tactical_level,region,actor_v2,score,status,event_timestamp,war_data,weapon_v2,target_v2,context_actor,intent,title_fingerprint FROM {$table} WHERE {$clause} ORDER BY event_timestamp DESC LIMIT %d OFFSET %d";
-
-    $total = $params
-        ? (int)$wpdb->get_var($wpdb->prepare($count_sql, ...$params))
-        : (int)$wpdb->get_var($count_sql);
-    $all_params = array_merge($params, [$per, $offset]);
-    $rows = $wpdb->prepare($data_sql, ...$all_params);
-    $items = $wpdb->get_results($rows, ARRAY_A);
-
-    // Tag items with manual learning flag
-    if ($items) {
-        $fps = array_filter(array_column($items, 'title_fingerprint'));
-        $learned = [];
-        if ($fps) {
-            $ph = implode(',', array_fill(0, count($fps), '%s'));
-            $lrows = $wpdb->get_col($wpdb->prepare("SELECT title_fingerprint FROM {$lrn_tbl} WHERE title_fingerprint IN ({$ph})", ...$fps));
-            $learned = array_flip($lrows);
-        }
-        foreach ($items as &$it) {
-            $it['has_learning'] = isset($learned[$it['title_fingerprint'] ?? '']);
-            $it['score'] = (int)$it['score'];
-            $it['event_timestamp'] = (int)$it['event_timestamp'];
-            $wd = [];
-            if (!empty($it['war_data'])) { $tmp = json_decode($it['war_data'], true); if (is_array($tmp)) $wd = $tmp; }
-            $it['actor_v2'] = sod_force_requested_actor_rule((string)($it['actor_v2'] ?? ''), (string)($it['region'] ?? ''), (string)($it['title'] ?? ''));
-            $it['context_actor'] = (string)($it['context_actor'] ?: ($wd['context_actor'] ?? ''));
-            $it['intent'] = (string)($it['intent'] ?: ($wd['intent'] ?? ''));
-            $it['target_v2'] = (string)($it['target_v2'] ?: ($wd['target'] ?? ''));
-            $it['weapon_v2'] = (string)($it['weapon_v2'] ?: ($wd['weapon_means'] ?? ''));
-        }
-        unset($it);
-    }
-    wp_send_json_success(['items' => $items ?? [], 'total' => $total, 'page' => $page, 'per_page' => $per]);
-}
-
-function sod_ajax_newslog_save(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_save', 'nonce');
-    global $wpdb;
-    $table = $wpdb->prefix . 'so_news_events';
-    $id = (int)($_POST['id'] ?? 0);
-    if (!$id) { wp_send_json_error('invalid id'); }
-
-    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id=%d", $id), ARRAY_A);
-    if (!$row) { wp_send_json_error('not found'); }
-
-    $new_title  = sanitize_textarea_field(wp_unslash($_POST['title']     ?? $row['title']));
-    $intel_type = sanitize_text_field(wp_unslash($_POST['intel_type']    ?? $row['intel_type']));
-    $tac_level  = sanitize_text_field(wp_unslash($_POST['tactical_level']?? $row['tactical_level']));
-    $region     = sanitize_text_field(wp_unslash($_POST['region']        ?? $row['region']));
-    $actor      = sanitize_text_field(wp_unslash($_POST['actor_v2']      ?? $row['actor_v2']));
-    $score      = min(400, max(0, (int)($_POST['score'] ?? $row['score'])));
-    $status     = sanitize_key($_POST['status'] ?? ($row['status'] ?? 'published'));
-    $weapon     = sanitize_text_field(wp_unslash($_POST['weapon_v2']     ?? ''));
-    $target     = sanitize_text_field(wp_unslash($_POST['target_v2']     ?? ''));
-    $context    = sanitize_text_field(wp_unslash($_POST['context_actor'] ?? ''));
-    $intent     = sanitize_text_field(wp_unslash($_POST['intent']        ?? ''));
-    $actor      = sod_force_requested_actor_rule($actor, $region, $new_title);
-
-    // Update so_news_events
-    $update = [
-        'intel_type'=>$intel_type,
-        'tactical_level'=>$tac_level,
-        'region'=>$region,
-        'actor_v2'=>$actor,
-        'score'=>$score,
-        'status'=>$status,
-        'weapon_v2'=>$weapon,
-        'target_v2'=>$target,
-        'context_actor'=>$context,
-        'intent'=>$intent
-    ];
-    if ($new_title !== $row['title']) $update['title'] = $new_title;
-    // Sync war_data JSON with edits
-    $wd = [];
-    if (!empty($row['war_data'])) { $parsed = json_decode($row['war_data'], true); if (is_array($parsed)) $wd = $parsed; }
-    if ($weapon) $wd['weapon_means'] = $weapon;
-    if ($target) $wd['target'] = $target;
-    if ($actor)  $wd['actor']  = $actor;
-    if ($context !== '') $wd['context_actor'] = $context;
-    if ($intent !== '')  $wd['intent'] = $intent;
-    $wd['region']     = $region;
-    $wd['intel_type'] = $intel_type;
-    $wd['early_warning'] = sod_early_warning_ai($new_title, ['actor'=>$actor, 'region'=>$region, 'intel_type'=>$intel_type]);
-    $update['war_data'] = wp_json_encode($wd, JSON_UNESCAPED_UNICODE);
-    
-$res = sod_db_safe_update($table, $update, ['id'=>$id]);
-if (empty($res['ok'])) {
-    sod_db_log_error('newslog_save', (string)($res['error'] ?? 'unknown'), ['table'=>$table,'id'=>$id,'update'=>$update]);
-    wp_send_json_error('db update failed: ' . (string)($res['error'] ?? 'unknown'));
-}
-
-    foreach ([['types',$intel_type],['levels',$tac_level],['regions',$region],['actors',$actor],['targets',$target],['contexts',$context],['intents',$intent],['weapons',$weapon]] as $pair) {
-        [$bk,$val] = $pair;
-        if ($val !== '') sod_add_bank_value($bk, $val);
-    }
-
-    // Save to manual learning (so the system remembers this correction)
-    $event_fake = ['title'=>$new_title,'source_name'=>$row['source_name']??''];
-    $payload    = ['actor_v2'=>$actor,'region'=>$region,'intel_type'=>$intel_type,'tactical_level'=>$tac_level,'score'=>$score,'title'=>$new_title,'target_v2'=>$target,'context_actor'=>$context,'intent'=>$intent,'weapon_v2'=>$weapon,'_early_warning'=>sod_early_warning_ai($new_title, ['actor'=>$actor,'region'=>$region,'intel_type'=>$intel_type])];
-    SO_Manual_Learning::save_feedback($event_fake, $payload);
-
-    wp_send_json_success(['updated' => 1]);
-}
-
-function sod_ajax_newslog_reclassify(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_reclassify', 'nonce');
-    global $wpdb;
-    $table = $wpdb->prefix . 'so_news_events';
-    $mode  = sanitize_key($_POST['mode'] ?? 'single');
-    $id    = (int)($_POST['id'] ?? 0);
-
-    $reclassify_row = function(array $row) use ($wpdb, $table) {
-        $item = [
-            'title'      => (string)($row['title'] ?? ''),
-            'link'       => (string)($row['link'] ?? ''),
-            'source'     => (string)($row['source_name'] ?? $row['source'] ?? ''),
-            'color'      => (string)($row['source_color'] ?? '#1da1f2'),
-            'date'       => (string)($row['event_timestamp'] ?? ''),
-            'agency_loc' => (string)($row['agency_loc'] ?? ''),
-            'image_url'  => (string)($row['image_url'] ?? ''),
-        ];
-
-        $analyzed = SO_OSINT_Engine::process_event($item);
-        if (!$analyzed || !is_array($analyzed)) {
-            return ['ok' => false, 'error' => 'classification failed'];
-        }
-
-        $analyzed = SO_Manual_Learning::apply_to_analyzed($item, $analyzed);
-        $analyzed['actor_v2'] = sod_force_requested_actor_rule((string)($analyzed['actor_v2'] ?? ''), (string)($analyzed['region'] ?? ''), (string)($item['title'] ?? ''));
-
-        $wd = [];
-        if (!empty($analyzed['war_data'])) {
-            $tmp = json_decode($analyzed['war_data'], true);
-            if (is_array($tmp)) $wd = $tmp;
-        }
-        $wd['actor'] = $analyzed['actor_v2'];
-        if (!isset($wd['target']) && !empty($analyzed['target_v2'])) $wd['target'] = $analyzed['target_v2'];
-        if (!isset($wd['context_actor']) && !empty($analyzed['context_actor'])) $wd['context_actor'] = $analyzed['context_actor'];
-        if (!isset($wd['intent']) && !empty($analyzed['intent'])) $wd['intent'] = $analyzed['intent'];
-        if (!isset($wd['early_warning'])) {
-            $wd['early_warning'] = sod_early_warning_ai((string)($item['title'] ?? ''), [
-                'actor' => (string)($analyzed['actor_v2'] ?? ''),
-                'region' => (string)($analyzed['region'] ?? ''),
-                'intel_type' => (string)($analyzed['intel_type'] ?? ''),
-            ]);
-        }
-        $analyzed['war_data'] = wp_json_encode($wd, JSON_UNESCAPED_UNICODE);
-
-        $target_v2 = (string)($wd['target'] ?? '');
-        $context_actor = (string)($wd['context_actor'] ?? '');
-        $intent = (string)($wd['intent'] ?? '');
-        $weapon_v2 = (string)($wd['weapon_means'] ?? '');
-
-        
-$res = sod_db_safe_update($table, [
-    'intel_type'     => (string)($analyzed['intel_type'] ?? ''),
-    'tactical_level' => (string)($analyzed['tactical_level'] ?? ''),
-    'region'         => (string)($analyzed['region'] ?? ''),
-    'actor_v2'       => (string)($analyzed['actor_v2'] ?? ''),
-    'score'          => (int)($analyzed['score'] ?? 0),
-    'war_data'       => (string)($analyzed['war_data'] ?? '{}'),
-    'field_data'     => (string)($analyzed['field_data'] ?? '{}'),
-    'target_v2'      => $target_v2,
-    'context_actor'  => $context_actor,
-    'intent'         => $intent,
-    'weapon_v2'      => $weapon_v2,
-], ['id' => (int)$row['id']]);
-
-if (empty($res['ok'])) {
-    sod_db_log_error('newslog_reclassify', (string)($res['error'] ?? 'unknown'), [
-        'table' => $table,
-        'id'    => (int)$row['id'],
-        'target_v2' => $target_v2,
-        'context_actor' => $context_actor,
-        'intent' => $intent,
-        'weapon_v2' => $weapon_v2,
-    ]);
-    return ['ok' => false, 'error' => 'db update failed: ' . (string)($res['error'] ?? 'unknown')];
-}
-
-        foreach ([['types',(string)($analyzed['intel_type'] ?? '')],['levels',(string)($analyzed['tactical_level'] ?? '')],['regions',(string)($analyzed['region'] ?? '')],['actors',(string)($analyzed['actor_v2'] ?? '')],['targets',$target_v2],['contexts',$context_actor],['intents',$intent],['weapons',$weapon_v2]] as $pair) {
-            [$bk,$val] = $pair;
-            if ($val !== '') sod_add_bank_value($bk, $val);
-        }
-
-        return [
-            'ok'        => true,
-            'new_score' => (int)($analyzed['score'] ?? 0),
-            'new_actor' => (string)($analyzed['actor_v2'] ?? ''),
-            'new_region'=> (string)($analyzed['region'] ?? ''),
-        ];
-    };
-
-    if ($mode === 'single') {
-        if (!$id) { wp_send_json_error('invalid id'); }
-        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id=%d", $id), ARRAY_A);
-        if (!$row) { wp_send_json_error('not found'); }
-        try {
-            $result = $reclassify_row($row);
-            if (empty($result['ok'])) {
-                wp_send_json_error($result['error'] ?? 'classification failed');
-            }
-            wp_send_json_success(['updated'=>1,'new_score'=>$result['new_score'],'new_actor'=>$result['new_actor'],'new_region'=>$result['new_region']]);
-        } catch (Throwable $e) {
-            wp_send_json_error('reclassify exception: ' . $e->getMessage());
-        }
-    } else {
-        $updated = 0;
-        $batch = 200;
-        $offset = 0;
-        set_time_limit(120);
-        do {
-            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} ORDER BY id DESC LIMIT %d OFFSET %d", $batch, $offset), ARRAY_A);
-            if (empty($rows)) break;
-            foreach ($rows as $row) {
-                try {
-                    $result = $reclassify_row($row);
-                    if (!empty($result['ok'])) $updated++;
-                } catch (Throwable $e) {
-                    // continue batch safely
-                }
-            }
-            $offset += $batch;
-        } while (count($rows) === $batch);
-        wp_send_json_success(['updated'=>$updated]);
-    }
-}
-
-// حذف جماعي / تحديث جماعي للحالة
-function sod_ajax_newslog_bulk(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_bulk', 'nonce');
-    global $wpdb;
-    $table  = $wpdb->prefix . 'so_news_events';
-    $action = sanitize_text_field($_POST['bulk_action'] ?? '');
-    $ids_raw = $_POST['ids'] ?? '';
-    $ids = array_filter(array_map('intval', is_array($ids_raw) ? $ids_raw : explode(',', $ids_raw)));
-    if (empty($ids)) { wp_send_json_error('no ids'); }
-    $placeholders = implode(',', array_fill(0, count($ids), '%d'));
-    if ($action === 'delete') {
-        $affected = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id IN ({$placeholders})", ...$ids));
-        wp_send_json_success(['deleted' => $affected]);
-    } elseif (in_array($action, ['published','pending','draft'], true)) {
-        $affected = $wpdb->query($wpdb->prepare("UPDATE {$table} SET status=%s WHERE id IN ({$placeholders})", $action, ...$ids));
-        wp_send_json_success(['updated' => $affected, 'status' => $action]);
-    } else {
-        wp_send_json_error('unknown action');
-    }
-}
-
-// جلب قوائم البنوك (الجهات الفاعلة + التصنيفات)
-function sod_ajax_newslog_get_banks(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_search', 'nonce');
-    wp_send_json_success(sod_get_visible_learning_banks());
-}
-
-// إضافة قيمة جديدة لبنك الجهات الفاعلة
-function sod_ajax_newslog_add_to_bank(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_save', 'nonce');
-    $bank = sanitize_text_field($_POST['bank'] ?? '');
-    $value = sanitize_text_field($_POST['value'] ?? '');
-    if (!$value) { wp_send_json_error('empty value'); }
-    $banks = sod_add_bank_value($bank, $value);
-    wp_send_json_success(['bank'=>sod_normalize_bank_key($bank),'value'=>$value,'banks'=>$banks]);
-}
-
-function sod_ajax_newslog_remove_from_bank(): void {
-    if (!current_user_can('manage_options')) { wp_send_json_error('unauthorized', 403); }
-    check_ajax_referer('sod_newslog_save', 'nonce');
-    $bank = sanitize_text_field($_POST['bank'] ?? '');
-    $value = sanitize_text_field($_POST['value'] ?? '');
-    if (!$value) { wp_send_json_error('invalid'); }
-    $banks = sod_remove_bank_value($bank, $value);
-    wp_send_json_success(['bank'=>sod_normalize_bank_key($bank),'value'=>$value,'banks'=>$banks]);
-}
 
 // ==========================================================================
 // 15b. SO_Executive_Reports — التقارير الدورية للمجتمع الاستخباراتي
@@ -4585,11 +4615,24 @@ class SO_Auto_Publisher_AI {
 if (!class_exists('SO_Prediction_Engine')) {
 class SO_Prediction_Engine {
     public static function generate_scenarios($state = []) {
+        $title = (string)($state['title'] ?? $state['headline'] ?? '');
+        $prediction = sod_prediction_layer($title, [
+            'actor' => (string)($state['actor'] ?? $state['actor_v2'] ?? ''),
+            'region' => (string)($state['region'] ?? ''),
+            'intel_type' => (string)($state['intel_type'] ?? ''),
+            'target' => (string)($state['target'] ?? $state['target_v2'] ?? ''),
+            'weapon' => (string)($state['weapon'] ?? $state['weapon_v2'] ?? ''),
+            'early_warning' => is_array($state['early_warning'] ?? null) ? $state['early_warning'] : [],
+        ]);
+
+        $base = max(20, min(80, (int)$prediction['confidence']));
+        $risk = (int)($prediction['risk_score'] ?? 0);
+
         $scenarios = [
-            ['name' => 'احتواء واستنزاف', 'probability' => 40.0, 'desc' => 'احتمالية بقاء التوتر ضمن الساحات العازلة مع الحفاظ على قواعد اشتباك مضبوطة.'],
-            ['name' => 'تصعيد إقليمي',    'probability' => 32.0, 'desc' => 'مؤشرات ميدانية تشير إلى تصاعد وتيرة العمليات الميدانية.'],
-            ['name' => 'سيناريو مفاجئ',  'probability' => 15.0, 'desc' => 'احتمالية حدث غير متوقع يغير موازين القوى.'],
-            ['name' => 'تهدئة وتراجع',    'probability' => 13.0, 'desc' => 'ضعف الإشارات يشير إلى انخفاض تدريجي في وتيرة العمليات.'],
+            ['name' => 'استمرار النمط الحالي', 'probability' => (float)max(18, min(72, $base)), 'desc' => (string)$prediction['scenario']],
+            ['name' => 'تصعيد إقليمي محدود', 'probability' => (float)max(10, min(65, (int)round($risk * 0.7))), 'desc' => 'ترجيح تصاعد قريب إذا تكررت المؤشرات نفسها على الساحة ذاتها.'],
+            ['name' => 'احتواء/تبريد', 'probability' => (float)max(8, 100 - max(18, min(72, $base)) - max(10, min(65, (int)round($risk * 0.7))) - 10), 'desc' => 'احتمال التراجع إذا لم تظهر مؤشرات ميدانية أو إنذارية إضافية.'],
+            ['name' => 'حدث مفاجئ خارج النمط', 'probability' => 10.0, 'desc' => 'يبقى احتمال التحول المفاجئ قائمًا لكنه غير المدعوم حاليًا بمؤشرات كافية.'],
         ];
         return $scenarios;
     }
@@ -4667,8 +4710,8 @@ function sod_dashboard_route_enabled(): bool {
 }
 
 function sod_dashboard_display_mode(): string {
-    $mode = sanitize_key((string) get_option('sod_dashboard_display_mode', 'command_deck'));
-    return in_array($mode, ['powerbi', 'command_deck', 'all', 'custom'], true) ? $mode : 'command_deck';
+    $mode = sanitize_key((string) get_option('sod_dashboard_display_mode', 'custom'));
+    return in_array($mode, ['powerbi', 'all', 'custom'], true) ? $mode : 'custom';
 }
 
 function sod_dashboard_display_order(): string {
@@ -4723,21 +4766,25 @@ function sod_available_dashboard_panels(): array {
 
 function sod_dashboard_selected_panels(): array {
     $available = sod_available_dashboard_panels();
-    $selected = get_option('sod_dashboard_selected_panels', ['command_deck']);
-    if (!is_array($selected)) $selected = ['command_deck'];
+    $allowed = ['powerbi','ticker','threat_analyzer'];
+    $selected = get_option('sod_dashboard_selected_panels', ['powerbi','ticker','threat_analyzer']);
+    if (!is_array($selected)) $selected = ['powerbi','ticker','threat_analyzer'];
     $selected = array_values(array_filter(array_map('sanitize_key', $selected), function($key) use ($available){
         return isset($available[$key]);
     }));
-    if (empty($selected)) $selected = ['command_deck'];
+    $selected = array_values(array_filter($selected, function($key) use ($allowed){
+        return in_array($key, $allowed, true);
+    }));
+    if (empty($selected)) $selected = ['powerbi','ticker','threat_analyzer'];
     return $selected;
 }
 
 function sod_get_dashboard_route_shortcodes(): array {
     $available = sod_available_dashboard_panels();
     $powerbi = $available['powerbi']['shortcode'];
-    $command = $available['command_deck']['shortcode'];
+    $ticker = $available['ticker']['shortcode'];
+    $threat = $available['threat_analyzer']['shortcode'];
     $mode = sod_dashboard_display_mode();
-    $order = sod_dashboard_display_order();
     $selected = sod_dashboard_selected_panels();
 
     if ($mode === 'custom') {
@@ -4748,17 +4795,11 @@ function sod_get_dashboard_route_shortcodes(): array {
             }
         }
         if (!empty($parts)) return $parts;
-        return [$command];
+        return [$powerbi, $ticker, $threat];
     }
 
     if ($mode === 'powerbi') return [$powerbi];
-    if ($mode === 'command_deck') return [$command];
-
-    if ($mode === 'all') {
-        return $order === 'command_powerbi' ? [$command, $powerbi] : [$powerbi, $command];
-    }
-
-    return [$command];
+    return [$powerbi, $ticker, $threat];
 }
 
 function sod_render_dashboard_route_content(): string {
@@ -6244,13 +6285,14 @@ function renderNews(){
         const bc=scoreBadgeClass(ev.score);
         const conf=Math.min(100,Math.round((ev.score/300)*100));
         const aiB=ev.llm_verified?'<span class="sod-badge sod-badge-blue" title="تم التحقق بالذكاء الاصطناعي">🤖 AI</span>':'';
+        const evalB=ev.has_manual_override?'<span class="sod-badge sod-badge-orange" title="العنصر محفوظ يدويًا ومقفل من إعادة التحليل">✍️ يدوي</span>':`<span class="sod-badge sod-badge-green" title="آخر تقييم مسجل">${esc(ev.evaluation_label||'آلي')}</span>`;
         return `<div class="sod-news-card">
             <div class="sod-news-card-meta">
                 <span class="sod-badge ${bc}">${ar(ev.score)} — ${lbl}</span>
                 ${ev.actor_v2?`<span class="sod-badge sod-badge-gray">${esc(ev.actor_v2.substring(0,25))}</span>`:''}
                 ${ev.region?`<span class="sod-badge sod-badge-purple">${esc(ev.region)}</span>`:''}
                 ${ev.intel_type?`<span class="sod-badge sod-badge-blue">${esc(ev.intel_type.substring(0,20))}</span>`:''}
-                ${aiB}
+                ${evalB}${aiB}
             </div>
             <div class="sod-news-title">
                 <a href="${esc(ev.link)}" target="_blank" rel="noopener noreferrer">${esc(ev.title)}</a>
@@ -7029,6 +7071,54 @@ class SO_Admin_UI {
     public static function enqueue_admin_assets($hook) {
         if (strpos($hook, 'beiruttime-osint') === false && strpos($hook, 'strategic-osint') === false) return;
         wp_enqueue_style('so-admin-font', 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap', [], null);
+        $page = sanitize_text_field($_GET['page'] ?? '');
+        if ($page === 'strategic-osint-newslog') {
+            $admin_css = __DIR__ . '/assets/css/admin-pages.css';
+            wp_enqueue_style(
+                'sod-admin-pages',
+                plugins_url('assets/css/admin-pages.css', __FILE__),
+                [],
+                file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
+            );
+            $newslog_js = __DIR__ . '/assets/js/newslog-admin.js';
+            wp_enqueue_script(
+                'sod-newslog-admin',
+                plugins_url('assets/js/newslog-admin.js', __FILE__),
+                [],
+                file_exists($newslog_js) ? (string) filemtime($newslog_js) : '1.0.0',
+                true
+            );
+            wp_localize_script('sod-newslog-admin', 'sodNewslogConfig', [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonces' => [
+                    'search' => wp_create_nonce('sod_newslog_search'),
+                    'save' => wp_create_nonce('sod_newslog_save'),
+                    'reclassify' => wp_create_nonce('sod_newslog_reclassify'),
+                    'bulk' => wp_create_nonce('sod_newslog_bulk'),
+                    'bank' => wp_create_nonce('sod_newslog_save'),
+                ],
+            ]);
+        } elseif ($page === 'strategic-osint-db') {
+            $admin_css = __DIR__ . '/assets/css/admin-pages.css';
+            wp_enqueue_style(
+                'sod-admin-pages',
+                plugins_url('assets/css/admin-pages.css', __FILE__),
+                [],
+                file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
+            );
+            $db_admin_js = __DIR__ . '/assets/js/db-admin.js';
+            wp_enqueue_script(
+                'sod-db-admin',
+                plugins_url('assets/js/db-admin.js', __FILE__),
+                [],
+                file_exists($db_admin_js) ? (string) filemtime($db_admin_js) : '1.0.0',
+                true
+            );
+            wp_localize_script('sod-db-admin', 'sodDbAdminConfig', [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('so_ajax_v13'),
+            ]);
+        }
     }
 
     public static function register_menus() {
@@ -8345,7 +8435,7 @@ public static function ajax_duplicate_cleanup_batch() {
     global $wpdb;
     $table = $wpdb->prefix . 'so_news_events';
 
-    $batch = isset($_POST['batch']) ? max(10, min(2000, intval($_POST['batch']))) : 300;
+    $batch = isset($_POST['batch']) ? max(10, min(2000, intval($_POST['batch']))) : 50;
     $reset = !empty($_POST['reset']);
     $cursor = (int) get_option('so_duplicate_cleanup_cursor', 0);
 
@@ -8470,8 +8560,10 @@ public static function ajax_reanalyze_batch() {
     if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'forbidden'], 403);
     check_ajax_referer('so_ajax_v13', 'nonce');
 
-    $batch = isset($_POST['batch']) ? max(10, min(2000, intval($_POST['batch']))) : 300;
-    $progress = so_reanalyze_all_news_events_full($batch, false);
+    $batch = isset($_POST['batch']) ? max(10, min(2000, intval($_POST['batch']))) : 50;
+    $force_reset = !empty($_POST['reset']) || !empty($_POST['force_reset']);
+    $should_reset = $force_reset || ((int)get_option('so_reanalyze_cursor', 0) === 0 && (int)get_option('so_reanalyze_running', 0) === 0);
+    $progress = so_reanalyze_all_news_events_full($batch, $should_reset);
     wp_send_json_success($progress);
 }
 
@@ -8483,7 +8575,7 @@ public static function ajax_reanalyze_reset() {
     update_option('so_reanalyze_running', 0, false);
     update_option('so_reanalyze_progress', [
         'time' => time(),
-        'batch' => 300,
+        'batch' => 50,
         'processed' => 0,
         'total' => 0,
         'percent' => 0,
@@ -8516,7 +8608,7 @@ public static function page_db() {
                 $dup_deleted_total = (int)($dup_progress['deleted_total'] ?? 0);
                 $dup_running = !empty($dup_progress['running']);
                 $dup_done = !empty($dup_progress['done']);
-                $dup_batch = (int)($dup_progress['batch'] ?? 500);
+                $dup_batch = (int)($dup_progress['batch'] ?? 50);
             ?>
             <p>يشغّل التنظيف على دفعات صغيرة عبر AJAX حتى لا يرهق السيرفر أو يسبب خطأ ووردبريس. يمكنك الإكمال من آخر نقطة أو إعادة البدء من الصفر.</p>
             <div style="background:#0f172a;border-radius:12px;padding:12px;margin:8px 0 12px;">
@@ -8533,13 +8625,13 @@ public static function page_db() {
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <label style="display:flex;align-items:center;gap:6px;">
                     <span>حجم الدفعة:</span>
-                    <input type="number" id="so-dup-batch" value="<?php echo intval($dup_batch ?: 300); ?>" min="10" max="2000" step="10" style="width:120px;">
+                    <input type="number" id="so-dup-batch" value="<?php echo intval($dup_batch ?: 50); ?>" min="10" max="2000" step="10" style="width:120px;">
                 </label>
                 <button type="button" class="button button-primary" id="so-dup-run"><?php echo $dup_done ? 'تشغيل تنظيف جديد' : 'متابعة تنظيف المكرر'; ?></button>
                 <button type="button" class="button" id="so-dup-reset">إعادة البدء من الصفر</button>
                 <span id="so-dup-msg" style="color:#64748b;font-size:12px;"></span>
             </div>
-            <script>
+            <script type="text/template" id="sod-db-dup-inline-disabled">
             (function(){
                 const runBtn = document.getElementById('so-dup-run');
                 const resetBtn = document.getElementById('so-dup-reset');
@@ -8652,10 +8744,118 @@ public static function page_db() {
                         msgEl.textContent = 'تعذر تصفير المؤشر. تحقق من تسجيل الدخول والصلاحيات ثم أعد المحاولة.';
                     });
                 });
+                try {
+                    const host = runBtn.closest('.so-admin-card');
+                    const legacyForm = host ? host.querySelector('form[method="post"]') : null;
+                    if (legacyForm) legacyForm.remove();
+                    if (host) {
+                        host.querySelectorAll('div[style*="height:12px;background:#1e293b"],div[style*="font-size:12px;color:#94a3b8;margin-top:8px"]').forEach(el => el.remove());
+                    }
+                } catch(e) {}
+            })();
+            </script>
+            <script type="text/template" id="sod-db-re-inline-disabled-1">
+            (function(){
+                let runBtn = document.getElementById('so-re-run');
+                let resetBtn = document.getElementById('so-re-reset');
+                const batchEl = document.getElementById('so-re-batch');
+                const msgEl = document.getElementById('so-re-msg');
+                const barEl = document.getElementById('so-re-bar');
+                const percentEl = document.getElementById('so-re-percent');
+                const processedEl = document.getElementById('so-re-processed');
+                const totalEl = document.getElementById('so-re-total');
+                const updatedEl = document.getElementById('so-re-updated');
+                const statusEl = document.getElementById('so-re-status');
+                const nextEl = document.getElementById('so-re-next');
+                const batchViewEl = document.getElementById('so-re-batch-view');
+                if(!runBtn||!resetBtn||!batchEl) return;
+                const cleanRun = runBtn.cloneNode(true);
+                const cleanReset = resetBtn.cloneNode(true);
+                runBtn.parentNode.replaceChild(cleanRun, runBtn);
+                resetBtn.parentNode.replaceChild(cleanReset, resetBtn);
+                runBtn = cleanRun;
+                resetBtn = cleanReset;
+                let running = false;
+                function updateUI(data){
+                    if(percentEl) percentEl.textContent = parseInt(data.percent || 0);
+                    if(processedEl) processedEl.textContent = parseInt(data.processed || 0);
+                    if(totalEl) totalEl.textContent = parseInt(data.total || 0);
+                    if(updatedEl) updatedEl.textContent = parseInt(data.updated || 0);
+                    if(nextEl) nextEl.textContent = parseInt(data.next_offset || 0);
+                    if(batchViewEl) batchViewEl.textContent = parseInt(data.batch || batchEl.value || 300);
+                    if(statusEl) statusEl.textContent = data.done ? 'مكتمل' : 'قيد المتابعة';
+                    if(barEl) barEl.style.width = parseInt(data.percent || 0) + '%';
+                }
+                function post(action, extra){
+                    const fd = new FormData();
+                    fd.append('action', action);
+                    fd.append('nonce', <?php echo wp_json_encode(wp_create_nonce('so_ajax_v13')); ?>);
+                    Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
+                    return fetch(ajaxurl, {method:'POST', body:fd}).then(r => r.json());
+                }
+                runBtn.onclick = function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (running) return false;
+                    running = true;
+                    runBtn.disabled = true;
+                    resetBtn.disabled = true;
+                    if(msgEl) msgEl.textContent = 'بدء إعادة التحليل الكامل...';
+                    let first = true;
+                    const step = function(){
+                        const payload = {batch: parseInt(batchEl.value || 300)};
+                        if (first && parseInt((totalEl&&totalEl.textContent)||0,10) === 0) payload.force_reset = 1;
+                        first = false;
+                        post('so_ajax_reanalyze_batch', payload).then((res)=>{
+                            if (!res || !res.success) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'ajax_failed');
+                            updateUI(res.data || {});
+                            if (res.data && res.data.done) {
+                                if(msgEl) msgEl.textContent = 'اكتملت إعادة التحليل الكامل.';
+                                running = false;
+                                runBtn.disabled = false;
+                                resetBtn.disabled = false;
+                                return;
+                            }
+                            if(msgEl) msgEl.textContent = 'التحليل يعمل... ' + String((res.data && res.data.percent) || 0) + '%';
+                            setTimeout(step, 200);
+                        }).catch((err)=>{
+                            if(msgEl) msgEl.textContent = 'فشل إعادة التحليل: ' + ((err && err.message) ? err.message : 'unknown');
+                            running = false;
+                            runBtn.disabled = false;
+                            resetBtn.disabled = false;
+                        });
+                    };
+                    step();
+                    return false;
+                };
+                resetBtn.onclick = function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (running) return false;
+                    if(msgEl) msgEl.textContent = 'جارٍ تصفير المؤشر...';
+                    post('so_ajax_reanalyze_reset', {}).then((res)=>{
+                        if (!res || !res.success) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'reset_failed');
+                        updateUI({percent:0, processed:0, total:0, updated:0, next_offset:0, done:0, batch:parseInt(batchEl.value || 300)});
+                        if(statusEl) statusEl.textContent = 'متوقف';
+                        if(msgEl) msgEl.textContent = 'تم تصفير المؤشر بنجاح.';
+                    }).catch((err)=>{
+                        if(msgEl) msgEl.textContent = 'تعذر التصفير: ' + ((err && err.message) ? err.message : 'unknown');
+                    });
+                    return false;
+                };
+                try {
+                    document.querySelectorAll('.so-admin-card h3').forEach((hdr)=>{
+                        const txt = (hdr.textContent || '').trim();
+                        if (txt.indexOf('دفعة أخيرة من الأخبار') !== -1) {
+                            const card = hdr.closest('.so-admin-card');
+                            if (card) card.style.display = 'none';
+                        }
+                    });
+                } catch(e) {}
             })();
             </script>
         </div>
-        <div class="so-admin-card" style="margin-bottom:14px;">
+        <div class="so-admin-card" style="margin-bottom:14px;display:none;">
             <h3>♻️ إعادة تحليل دفعة أخيرة من الأخبار</h3>
             <p>يعيد حساب المنطقة والفاعل والتصنيف والنقاط لآخر عدد تحدده من الأخبار. هذا الخيار يعيد نفس آخر الأخبار من البداية كل مرة، لذلك استخدم بطاقة المتابعة الكاملة أدناه إذا أردت تحليل كل القاعدة بالتدرج.</p>
             <form method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -8708,7 +8908,7 @@ public static function page_db() {
                 $p_running = !empty($progress['running']);
                 $p_done = !empty($progress['done']);
                 $p_next = (int)($progress['next_offset'] ?? 0);
-                $p_batch = (int)($progress['batch'] ?? 300);
+                $p_batch = (int)($progress['batch'] ?? 50);
                 $p_updated = (int)($progress['updated'] ?? 0);
             ?>
             <h3>🚀 إعادة التحليل الكامل (AJAX)</h3>
@@ -8723,18 +8923,18 @@ public static function page_db() {
                 <div style="height:12px;background:#1e293b;border-radius:999px;overflow:hidden;">
                     <div id="so-re-bar" style="height:12px;width:<?php echo intval($p_percent); ?>%;background:linear-gradient(90deg,#22c55e,#38bdf8);"></div>
                 </div>
-                <div style="font-size:12px;color:#94a3b8;margin-top:8px;">المؤشر التالي: <span id="so-re-next"><?php echo intval($p_next); ?></span> | حجم الدفعة: <span id="so-re-batch-view"><?php echo intval($p_batch ?: 300); ?></span></div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:8px;">المؤشر التالي: <span id="so-re-next"><?php echo intval($p_next); ?></span> | حجم الدفعة: <span id="so-re-batch-view"><?php echo intval($p_batch ?: 50); ?></span></div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <label style="display:flex;align-items:center;gap:6px;">
                     <span>حجم الدفعة:</span>
-                    <input type="number" id="so-re-batch" value="<?php echo intval($p_batch ?: 300); ?>" min="10" max="2000" step="10" style="width:120px;">
+                    <input type="number" id="so-re-batch" value="<?php echo intval($p_batch ?: 50); ?>" min="10" max="2000" step="10" style="width:120px;">
                 </label>
                 <button type="button" class="button button-primary" id="so-re-run"><?php echo $p_done ? 'تشغيل إعادة تحليل جديدة' : 'متابعة إعادة التحليل الكامل'; ?></button>
                 <button type="button" class="button" id="so-re-reset">إعادة البدء من الصفر</button>
                 <span id="so-re-msg" style="color:#64748b;font-size:12px;"></span>
             </div>
-            <script>
+            <script type="text/template" id="sod-db-re-inline-disabled-2">
             (function(){
                 const runBtn = document.getElementById('so-re-run');
                 const resetBtn = document.getElementById('so-re-reset');
@@ -8778,7 +8978,7 @@ public static function page_db() {
 
                     function step(){
                         post('so_ajax_reanalyze_batch', {batch: parseInt(batchEl.value || 300)}).then((res) => {
-                            if (!res || !res.success) throw new Error('ajax_failed');
+                            if (!res || !res.success) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'ajax_failed');
                             updateUI(res.data || {});
                             if (res.data.done) {
                                 msgEl.textContent = 'اكتملت إعادة التحليل الكامل.';
@@ -8789,8 +8989,8 @@ public static function page_db() {
                             }
                             msgEl.textContent = 'تمت معالجة دفعة جديدة... المتابعة تلقائيًا';
                             setTimeout(step, 250);
-                        }).catch(() => {
-                            msgEl.textContent = 'توقفت إعادة التحليل بسبب خطأ مؤقت. خفّض حجم الدفعة ثم أعد المحاولة.';
+                        }).catch((err) => {
+                            msgEl.textContent = 'توقفت إعادة التحليل بسبب خطأ: ' + ((err && err.message) ? err.message : 'مؤقت') + '. خفّض حجم الدفعة ثم أعد المحاولة.';
                             running = false;
                             runBtn.disabled = false;
                             resetBtn.disabled = false;
@@ -8808,14 +9008,23 @@ public static function page_db() {
                     if (running) return;
                     msgEl.textContent = 'جارِ تصفير المؤشر...';
                     post('so_ajax_reanalyze_reset', {}).then((res) => {
-                        if (!res || !res.success) throw new Error('reset_failed');
+                        if (!res || !res.success) throw new Error((res && res.data && (res.data.message || res.data.error)) || 'reset_failed');
                         updateUI({percent:0, processed:0, total:0, updated:0, next_offset:0, done:0, batch:parseInt(batchEl.value || 300)});
                         statusEl.textContent = 'متوقف';
                         msgEl.textContent = 'تمت إعادة البدء من الصفر. سيبدأ التحليل تلقائيًا عند الضغط على الزر.';
-                    }).catch(() => {
-                        msgEl.textContent = 'تعذر تصفير مؤشر إعادة التحليل.';
+                    }).catch((err) => {
+                        msgEl.textContent = 'تعذر تصفير مؤشر إعادة التحليل: ' + ((err && err.message) ? err.message : 'unknown');
                     });
                 });
+                try {
+                    const host = runBtn.closest('.so-admin-card');
+                    let sib = host ? host.nextElementSibling : null;
+                    while (sib && !sib.classList.contains('so-admin-card')) {
+                        const next = sib.nextElementSibling;
+                        sib.remove();
+                        sib = next;
+                    }
+                } catch(e) {}
             })();
             </script>
         </div>
@@ -9176,7 +9385,14 @@ public static function page_db() {
 /* Modal */
 .nl-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;align-items:center;justify-content:center;}
 .nl-modal-bg.open{display:flex;}
-.nl-modal{background:#0f172a;border:1px solid #1e3a5f;border-radius:14px;padding:24px;width:min(740px,95vw);max-height:90vh;overflow-y:auto;direction:rtl;color:#fff;}
+.nl-modal{background:#0f172a;border:1px solid #1e3a5f;border-radius:14px;padding:24px;width:min(740px,95vw);max-height:90vh;overflow-y:auto;direction:rtl;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,.45);}
+.nl-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.nl-form-field{min-width:0;}
+.nl-form-full{grid-column:1/-1;}
+.nl-form-field label{display:block;margin-bottom:6px;color:#c8dff2;font-weight:700;}
+.nl-modal textarea{width:100%;resize:vertical;min-height:72px;}
+.nl-modal button{white-space:nowrap;}
+@media(max-width:760px){.nl-form-grid{grid-template-columns:1fr;}.nl-modal{width:min(96vw,96vw);padding:16px;}}
 .nl-modal select,.nl-modal input,.nl-modal textarea{color:#ffffff !important;background:#1b2a3d !important;border:1px solid #33506f !important;}
 .nl-modal select option{color:#ffffff;background:#102033;}
 .nl-modal .nl-form-field select,.nl-modal .nl-form-field input,.nl-modal .nl-form-field textarea{font-weight:500;}
@@ -9187,6 +9403,14 @@ public static function page_db() {
 .nl-form-field input,.nl-form-field select,.nl-form-field textarea{background:#1e293b;border:1px solid #334155;color:#c8dff2;padding:8px 10px;border-radius:6px;font-size:13px;font-family:inherit;}
 .nl-form-field textarea{resize:vertical;min-height:60px;}
 .nl-form-full{grid-column:1/-1;}
+.nl-modal{width:min(860px,96vw)!important;padding:20px!important;}
+.nl-modal .nl-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px!important;align-items:start;}
+.nl-modal .nl-form-field{display:flex!important;flex-direction:column!important;gap:6px!important;min-width:0!important;}
+.nl-modal .nl-form-full{grid-column:1 / -1!important;}
+.nl-modal .nl-form-field input,.nl-modal .nl-form-field select,.nl-modal .nl-form-field textarea{width:100%!important;box-sizing:border-box!important;}
+.nl-modal #nl-edit-status{display:none!important;}
+.nl-modal .nl-form-field:has(#nl-edit-status){display:none!important;}
+@media(max-width:760px){.nl-modal .nl-form-grid{grid-template-columns:1fr!important;}.nl-modal{width:min(96vw,96vw)!important;padding:16px!important;}}
 .nl-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;font-weight:700;z-index:999999;display:none;}
 .nl-learning-badge{display:inline-block;background:#1e3a5f;color:#7dd3fc;border-radius:8px;padding:2px 7px;font-size:10px;margin-right:4px;}
 .nl-meta-stack{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
@@ -9195,14 +9419,22 @@ public static function page_db() {
 .nl-stats-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .nl-stat-pill{background:#0f2744;border:1px solid #1e3a5f;border-radius:8px;padding:8px 16px;font-size:12px;color:#94a3b8;}
 .nl-stat-pill b{color:#60a5fa;font-size:16px;display:block;}
+.nl-title-link{color:#dbeafe;cursor:pointer;font-weight:700;text-decoration:none;border-bottom:1px dashed rgba(125,211,252,.35);}
+.nl-title-link:hover{color:#7dd3fc;border-bottom-color:#7dd3fc;}
+.nl-status-box{display:none;margin-bottom:12px;background:#0b2038;border:1px solid #1e3a5f;border-radius:10px;padding:10px 14px;color:#c8dff2;}
+.nl-status-box.active{display:block;}
 </style>
 
 <div class="nl-wrap">
 <div class="nl-stats-bar">
+    <div class="nl-stat-pill" id="nl-classified-count"><b>â€”</b>مصنّف</div>
+    <div class="nl-stat-pill" id="nl-unclassified-count"><b>â€”</b>غير محسوم</div>
     <div class="nl-stat-pill"><b><?php echo number_format($total); ?></b>إجمالي الأخبار</div>
     <div class="nl-stat-pill" id="nl-filtered-count"><b>—</b>نتائج الفلتر</div>
     <div class="nl-stat-pill" id="nl-learned-count"><b><?php echo (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_manual_learning"); ?></b>أخبار محفوظة في التعلم</div>
 </div>
+
+<div id="nl-status-box" class="nl-status-box"></div>
 
 <div class="nl-toolbar">
     <input type="text" id="nl-q" placeholder="🔍 بحث في العناوين..." oninput="nlDebounce()">
@@ -9370,7 +9602,7 @@ public static function page_db() {
 <div class="nl-toast" id="nl-toast"></div>
 </div>
 
-<script>
+<script type="text/template" id="sod-newslog-inline-disabled">
 (function(){
 const nonces={
     search:<?php echo json_encode($nonce_search); ?>,
@@ -9380,6 +9612,34 @@ const nonces={
     bank:<?php echo json_encode($nonce_bank); ?>
 };
 let currentPage=1,currentItems=[],selectedIds=new Set(),BANKS={};
+function nlSetStatus(message,type='info'){
+    const box=document.getElementById('nl-status-box');
+    if(!box)return;
+    box.className='nl-status-box active';
+    box.style.borderColor=type==='error'?'#7f1d1d':(type==='success'?'#166534':'#1e3a5f');
+    box.style.background=type==='error'?'#2a0f14':(type==='success'?'#0f2a1a':'#0b2038');
+    box.innerHTML=message;
+}
+function nlUpdateStats(stats,total){
+    const filtered=document.querySelector('#nl-filtered-count b');
+    const classified=document.querySelector('#nl-classified-count b');
+    const unclassified=document.querySelector('#nl-unclassified-count b');
+    if(filtered)filtered.textContent=(total||0).toLocaleString('ar');
+    if(classified)classified.textContent=((stats&&stats.classified)||0).toLocaleString('ar');
+    if(unclassified)unclassified.textContent=((stats&&stats.unclassified)||0).toLocaleString('ar');
+}
+function nlExtractRelatedQuery(title){
+    const stopWords=['في','من','على','عن','إلى','الى','مع','هذا','هذه','ذلك','تلك','بعد','قبل','حول','بين','أمام','خلال','التي','الذي','كما','عند','تم','لقد','ثم','قال','أكد','أفاد','نقل','صورة','صور','خبر'];
+    const tokens=String(title||'').replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).map(s=>s.trim()).filter(Boolean);
+    const filtered=tokens.filter(t=>t.length>=3&&!stopWords.includes(t));
+    return filtered.slice(0,4).join(' ');
+}
+window.nlShowRelatedNews=function(title){
+    const q=nlExtractRelatedQuery(title)||String(title||'').trim();
+    document.getElementById('nl-q').value=q;
+    nlSetStatus('تمت تصفية سجل الأخبار حسب العنوان المرتبط: <strong>'+esc(q)+'</strong>','info');
+    nlLoad(1);
+};
 const BANK_SELECT_MAP={types:'nl-edit-type',levels:'nl-edit-level',regions:'nl-edit-region',actors:'nl-edit-actor',targets:'nl-edit-target',contexts:'nl-edit-context',intents:'nl-edit-intent',weapons:'nl-edit-weapon'};
 function refillSelect(id, values, keepValue=''){const el=document.getElementById(id);if(!el)return;const current=keepValue||el.value||'';el.innerHTML='';const empty=new Option('-- اختر --','');el.appendChild(empty);(values||[]).forEach(v=>{const o=new Option(v,v);el.appendChild(o);});if(current){for(const o of el.options){if(o.value===current||o.text===current){el.value=o.value;return;}}const o=new Option(current,current);el.appendChild(o);el.value=current;}}
 function refreshBankSelects(keep={}){
@@ -9493,7 +9753,7 @@ window.nlLoad=function(p){
         currentItems=d.data.items;
         renderTable(d.data.items);
         renderPager(d.data.total,d.data.page,d.data.per_page);
-        document.querySelector('#nl-filtered-count b').textContent=d.data.total.toLocaleString('ar');
+        nlUpdateStats(d.data.stats||{},d.data.total||0);
     }).catch(()=>showToast('تعذّر الاتصال','#dc2626'));
 };
 function renderTable(items){
@@ -9520,7 +9780,7 @@ function renderTable(items){
             <td style="text-align:center;"><input type="checkbox" class="nl-row-check" value="${e.id}" ${chk} style="cursor:pointer;accent-color:#2563eb;width:14px;height:14px;" onchange="nlRowCheck(this,${e.id})"></td>
             <td style="color:#5a7a9a;font-size:11px;white-space:nowrap;">${dt}</td>
             <td style="max-width:420px;">
-                <span title="${esc(e.title)}">${esc(e.title.substring(0,100))}${e.title.length>100?'...':''}</span>${learned}
+                <a href="#" class="nl-title-link" data-related="${encodeURIComponent(String(e.title||''))}" onclick="event.preventDefault();nlShowRelatedNews(decodeURIComponent(this.dataset.related||''))" title="${esc(e.title)}">${esc(e.title.substring(0,100))}${e.title.length>100?'...':''}</a>${learned}
                 ${chips ? `<div class="nl-meta-stack">${chips}</div>` : ''}
             </td>
             <td><span class="nl-badge">${esc(e.source_name||'—')}</span></td>
@@ -9569,6 +9829,8 @@ window.nlOpenEdit=function(e){
     });
     document.getElementById('nl-edit-score').value=e.score||0;
     setSelect('nl-edit-status',e.status||'published');
+    const evalEl=document.getElementById('nl-edit-evaluation');
+    if(evalEl){evalEl.textContent=(e.has_manual_override?'يدوي مقفل':'آخر تقييم: '+(e.evaluation_label||'آلي'));evalEl.style.display='block';}
     document.getElementById('nl-modal').classList.add('open');
 };
 function setSelect(id,val){const el=document.getElementById(id);if(!el)return;for(const o of el.options){if(o.value===val||o.text===val){el.value=o.value;return;}}};
@@ -9588,6 +9850,7 @@ window.nlSaveItem=function(){
         context_actor:document.getElementById('nl-edit-context').value,
         intent:document.getElementById('nl-edit-intent').value,
     };
+    nlSetStatus('جارٍ حفظ التعديل اليدوي...', 'info');
     fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data)})
     .then(r=>r.json()).then(d=>{
         if(d.success){showToast('✅ تم الحفظ والتعلم');nlCloseModal();nlLoad(currentPage);}
@@ -9631,6 +9894,174 @@ window.nlReclassifyAll=function(){
         else showToast('فشل إعادة التصنيف: '+(typeof d.data==='string'?d.data:JSON.stringify(d.data||'')),'#dc2626',6000);
         nlLoad(currentPage);
     });
+};
+window.nlReclassifyAll=function(){
+    if(!confirm('سيتم إعادة تصنيف جميع الأخبار. هذه العملية قد تستغرق وقتًا. هل تريد المتابعة؟'))return;
+    showToast('جارٍ إعادة التصنيف...','#2563eb',5000);
+    fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'sod_newslog_reclassify',nonce:nonces.reclassify,mode:'all'})})
+    .then(r=>r.json()).then(d=>{
+        if(d.success){
+            const s=d.data.stats||{};
+            nlSetStatus(
+                'تمت إعادة تصنيف <strong>'+((d.data.updated)||0).toLocaleString('ar')+
+                '</strong> خبر. المصنّف الآن: <strong>'+((s.classified_after)||0).toLocaleString('ar')+
+                '</strong>، وغير المحسوم: <strong>'+((s.unclassified_after)||0).toLocaleString('ar')+
+                '</strong>. قبل العملية كان غير المحسوم <strong>'+((s.unclassified_before)||0).toLocaleString('ar')+'</strong>.',
+                'success'
+            );
+            showToast('تمت إعادة التصنيف بنجاح');
+        }else{
+            showToast('فشل إعادة التصنيف: '+(typeof d.data==='string'?d.data:JSON.stringify(d.data||'')),'#dc2626',6000);
+        }
+        nlLoad(currentPage);
+    }).catch(()=>showToast('تعذر تنفيذ إعادة التصنيف','#dc2626',6000));
+};
+window.nlSaveItem=function(){
+    const id=document.getElementById('nl-edit-id').value;
+    const data={action:'sod_newslog_save',nonce:nonces.save,id,
+        title:document.getElementById('nl-edit-title').value,
+        intel_type:document.getElementById('nl-edit-type').value,
+        tactical_level:document.getElementById('nl-edit-level').value,
+        region:document.getElementById('nl-edit-region').value,
+        actor_v2:document.getElementById('nl-edit-actor').value,
+        score:document.getElementById('nl-edit-score').value,
+        status:document.getElementById('nl-edit-status').value,
+        weapon_v2:document.getElementById('nl-edit-weapon').value,
+        target_v2:document.getElementById('nl-edit-target').value,
+        context_actor:document.getElementById('nl-edit-context').value,
+        intent:document.getElementById('nl-edit-intent').value,
+    };
+    nlSetStatus('جارٍ حفظ التعديل اليدوي...', 'info');
+    fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data)})
+    .then(r=>r.json()).then(d=>{
+        if(d.success){
+            nlSetStatus('تم حفظ التعديل اليدوي بنجاح، وأصبح الخبر مقفلاً يدويًا.', 'success');
+            showToast('تم الحفظ والتعلم بنجاح');
+            nlCloseModal();
+            nlLoad(currentPage);
+        }else{
+            const err=(typeof d.data==='string'?d.data:JSON.stringify(d.data||{}));
+            nlSetStatus('فشل حفظ التعديل اليدوي: '+err, 'error');
+            showToast('فشل الحفظ: '+err,'#dc2626',7000);
+        }
+    }).catch(()=>{
+        nlSetStatus('تعذر الاتصال أثناء حفظ التعديل اليدوي.', 'error');
+        showToast('تعذر تنفيذ الحفظ','#dc2626',7000);
+    });
+};
+window.nlReclassifyOneDirect=function(id){
+    nlSetStatus('جارٍ إعادة تصنيف الخبر المحدد...', 'info');
+    fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'sod_newslog_reclassify',nonce:nonces.reclassify,id,mode:'single'})})
+    .then(r=>r.json()).then(d=>{
+        if(d.success){
+            nlSetStatus('اكتملت إعادة التصنيف للخبر المحدد بنجاح.', 'success');
+            showToast('أعيد التصنيف بنجاح');
+            nlCloseModal();
+            nlLoad(currentPage);
+        }else{
+            const err=(typeof d.data==='string'?d.data:JSON.stringify(d.data||{}));
+            nlSetStatus('فشلت إعادة التصنيف: '+err, 'error');
+            showToast('فشل إعادة التصنيف: '+err,'#dc2626',7000);
+        }
+    }).catch(()=>{
+        nlSetStatus('تعذر تنفيذ إعادة التصنيف لهذا الخبر.', 'error');
+        showToast('تعذر تنفيذ إعادة التصنيف','#dc2626',7000);
+    });
+};
+window.nlReclassifyAll=function(){
+    if(!confirm('سيتم إعادة تصنيف جميع الأخبار. هذه العملية قد تستغرق وقتًا. هل تريد المتابعة؟'))return;
+    nlSetStatus('بدأت إعادة تصنيف كل الأخبار. انتظر حتى تصل النتيجة النهائية هنا.', 'info');
+    showToast('جارٍ إعادة التصنيف...','#2563eb',5000);
+    fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'sod_newslog_reclassify',nonce:nonces.reclassify,mode:'all'})})
+    .then(r=>r.json()).then(d=>{
+        if(d.success){
+            const s=d.data.stats||{};
+            nlSetStatus(
+                'تمت إعادة تصنيف <strong>'+((d.data.updated)||0).toLocaleString('ar')+
+                '</strong> خبر. المصنّف الآن: <strong>'+((s.classified_after)||0).toLocaleString('ar')+
+                '</strong>، وغير المحسوم: <strong>'+((s.unclassified_after)||0).toLocaleString('ar')+
+                '</strong>. قبل العملية كان غير المحسوم <strong>'+((s.unclassified_before)||0).toLocaleString('ar')+'</strong>.',
+                'success'
+            );
+            showToast('تمت إعادة التصنيف بنجاح');
+        }else{
+            const err=(typeof d.data==='string'?d.data:JSON.stringify(d.data||{}));
+            nlSetStatus('فشلت إعادة تصنيف الكل: '+err, 'error');
+            showToast('فشل إعادة التصنيف: '+err,'#dc2626',7000);
+        }
+        nlLoad(currentPage);
+    }).catch(()=>{
+        nlSetStatus('تعذر تنفيذ إعادة تصنيف الكل بسبب خطأ اتصال أو مهلة.', 'error');
+        showToast('تعذر تنفيذ إعادة التصنيف','#dc2626',7000);
+    });
+};
+window.nlSaveItem=function(){
+    const id=document.getElementById('nl-edit-id').value;
+    const data={action:'sod_newslog_save',nonce:nonces.save,id,
+        title:document.getElementById('nl-edit-title').value,
+        intel_type:document.getElementById('nl-edit-type').value,
+        tactical_level:document.getElementById('nl-edit-level').value,
+        region:document.getElementById('nl-edit-region').value,
+        actor_v2:document.getElementById('nl-edit-actor').value,
+        score:document.getElementById('nl-edit-score').value,
+        status:document.getElementById('nl-edit-status').value,
+        weapon_v2:document.getElementById('nl-edit-weapon').value,
+        target_v2:document.getElementById('nl-edit-target').value,
+        context_actor:document.getElementById('nl-edit-context').value,
+        intent:document.getElementById('nl-edit-intent').value,
+    };
+    nlSetStatus('جارٍ حفظ التعديل اليدوي...', 'info');
+    fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data)})
+    .then(r=>r.json()).then(d=>{
+        if(d.success){
+            nlSetStatus('تم حفظ التعديل اليدوي بنجاح، وأصبح الخبر مقفلاً يدويًا.', 'success');
+            showToast('تم الحفظ والتعلم بنجاح');
+            nlCloseModal();
+            nlLoad(currentPage);
+        }else{
+            const err=(typeof d.data==='string'?d.data:JSON.stringify(d.data||{}));
+            nlSetStatus('فشل حفظ التعديل اليدوي: '+err, 'error');
+            showToast('فشل الحفظ: '+err,'#dc2626',7000);
+        }
+    }).catch(()=>{
+        nlSetStatus('تعذر الاتصال أثناء حفظ التعديل اليدوي.', 'error');
+        showToast('تعذر تنفيذ الحفظ','#dc2626',7000);
+    });
+};
+window.nlReclassifyAll=function(){
+    if(!confirm('سيتم إعادة تصنيف جميع الأخبار. هذه العملية قد تستغرق وقتًا. هل تريد المتابعة؟'))return;
+    let offset=0,totalUpdated=0,totalSkipped=0;
+    const batch=50;
+    nlSetStatus('بدأت إعادة تصنيف كل الأخبار على دفعات AJAX. 0%', 'info');
+    showToast('جارٍ إعادة التصنيف...','#2563eb',5000);
+    function step(){
+        fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'sod_newslog_reclassify',nonce:nonces.reclassify,mode:'all',offset,batch})})
+        .then(r=>r.json()).then(d=>{
+            if(!d.success){
+                const err=(typeof d.data==='string'?d.data:JSON.stringify(d.data||{}));
+                nlSetStatus('فشلت إعادة تصنيف الكل: '+err, 'error');
+                showToast('فشل إعادة التصنيف: '+err,'#dc2626',7000);
+                return;
+            }
+            const data=d.data||{};
+            totalUpdated += parseInt(data.updated||0,10);
+            totalSkipped += parseInt(data.skipped||0,10);
+            offset = parseInt(data.next_offset||0,10);
+            nlSetStatus('إعادة التصنيف قيد التنفيذ: <strong>'+((data.percent)||0).toLocaleString('ar')+'%</strong> — تمت معالجة <strong>'+((data.processed)||0).toLocaleString('ar')+'</strong> من <strong>'+((data.total)||0).toLocaleString('ar')+'</strong> خبر.', 'info');
+            if(data.done){
+                const s=data.stats||{};
+                nlSetStatus('اكتملت إعادة التصنيف. الأخبار التي أعيدت معالجتها: <strong>'+((totalUpdated)||0).toLocaleString('ar')+'</strong>. المصنّف الآن: <strong>'+((s.classified_after)||0).toLocaleString('ar')+'</strong>، وغير المحسوم: <strong>'+((s.unclassified_after)||0).toLocaleString('ar')+'</strong>.', 'success');
+                showToast('اكتملت إعادة التصنيف بنجاح');
+                nlLoad(currentPage);
+                return;
+            }
+            setTimeout(step,80);
+        }).catch(()=>{
+            nlSetStatus('تعذر تنفيذ إعادة تصنيف الكل بسبب خطأ اتصال أو مهلة.', 'error');
+            showToast('تعذر تنفيذ إعادة التصنيف','#dc2626',7000);
+        });
+    }
+    step();
 };
 function showToast(msg,color='#16a34a',dur=3000){const t=document.getElementById('nl-toast');t.textContent=msg;t.style.background=color;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',dur);}
 // Close modal on bg click
@@ -10610,7 +11041,7 @@ function sod_render_command_deck(array $atts=[]): string {
         </div>
         <div class="sod-cd-feed-wrap">
             <table class="sod-cd-feed-table">
-                <thead><tr><th>الوقت</th><th>درجة</th><th>الساحة</th><th>الجهة</th><th>النمط</th><th>الحدث</th></tr></thead>
+                <thead><tr><th>الوقت</th><th>درجة</th><th>النية</th><th>الحدث</th><th>المنطقة</th><th>المستوى</th></tr></thead>
                 <tbody id="<?php echo esc_attr($uid);?>-feed-body"><tr><td colspan="6" class="sod-cd-loading-row">⏳ جارٍ تحميل البيانات…</td></tr></tbody>
             </table>
         </div>
@@ -10739,6 +11170,11 @@ function sod_render_command_deck(array $atts=[]): string {
 .sod-cd-last-update{font-size:11px;color:#3a5a7a;}
 .sod-cd-search{background:#0d1f3c!important;border:1px solid #1e3a5f!important;color:#e0f2ff!important;padding:4px 8px!important;border-radius:7px!important;font-size:12px!important;font-family:'Cairo','Tajawal',sans-serif!important;width:140px;outline:none!important;box-shadow:none!important;}
 .sod-cd-feed-count{font-size:11px;color:#5a7a9a;}
+.sod-cd-title-link{color:#dbeafe!important;text-decoration:none!important;border-bottom:1px dashed rgba(125,211,252,.35);}
+.sod-cd-title-link:hover{color:#fff!important;border-bottom-color:#7dd3fc;}
+.sod-cd-meta-stack{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.sod-cd-mini-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(15,23,42,.9);border:1px solid rgba(51,65,85,.9);border-radius:999px;padding:2px 8px;font-size:10px;color:#9db4c8;max-width:100%;}
+.sod-cd-mini-chip b{color:#e2e8f0;font-weight:700;}
 /* Brief */
 .sod-cd-brief-card{margin:0 14px 14px;}
 .sod-cd-brief-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;padding:14px;}
@@ -10746,6 +11182,7 @@ function sod_render_command_deck(array $atts=[]): string {
 .sod-cd-brief-section{background:rgba(0,0,0,.2);border-right:3px solid #3b82f6;border-radius:8px;padding:12px 14px;}
 .sod-cd-brief-section-title{font-size:12px;font-weight:700;color:#7dd3fc;margin-bottom:8px;letter-spacing:.04em;}
 .sod-cd-brief-line{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px;color:#9db4c8;padding:4px 0;border-bottom:1px solid rgba(148,163,184,.07);}
+.sod-cd-brief-card,.so-ai-btn{display:none!important;}
 /* Print header */
 .sod-cd-print-hdr{display:none;padding:16px 20px;border-bottom:2px solid #000;margin-bottom:16px;justify-content:space-between;align-items:flex-start;}
 /* Modal */
@@ -10954,6 +11391,47 @@ function renderFeedPage(){
     if(pgWrap){let pgHtml='';for(let i=1;i<=Math.min(pages,10);i++){pgHtml+='<button class="sod-cd-pg-btn '+(i===currentPage?'active':'')+'" onclick="sodCdPage_'+UID+'('+i+')">'+i+'</button>';}if(pages>10)pgHtml+='<span style="color:#5a7a9a;font-size:11px;padding:0 6px;">… '+pages+' صفحة</span>';pgWrap.innerHTML=pgHtml;}
 }
 window['sodCdPage_'+UID]=function(p){currentPage=p;renderFeedPage();};
+
+function relatedFeedQuery(title){
+    const stopWords=['من','في','على','إلى','عن','مع','هذا','هذه','ذلك','تلك','بعد','قبل','حول','عند','بين','تم','رصد','خبر','عاجل'];
+    const parts=String(title||'').replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(Boolean);
+    const keywords=parts.filter(word=>word.length>2 && !stopWords.includes(word)).slice(0,4);
+    return keywords.join(' ').trim() || String(title||'').trim();
+}
+window['sodCdRelated_'+UID]=function(title){
+    const query=relatedFeedQuery(title);
+    const search=$e('search');
+    if(search)search.value=query;
+    applyFeedFilters();
+};
+function renderFeedPage(){
+    const tbody=$e('feed-body'),pgWrap=$e('pagination'),cntEl=$e('feed-count');if(!tbody)return;
+    const total=filteredEvents.length;const pages=Math.ceil(total/PAGE_SIZE);
+    if(cntEl)cntEl.textContent=total+' حدث';
+    const slice=filteredEvents.slice((currentPage-1)*PAGE_SIZE,currentPage*PAGE_SIZE);
+    if(!slice.length){tbody.innerHTML='<tr><td colspan="6" class="sod-cd-loading-row">لا توجد أحداث مطابقة</td></tr>';return;}
+    tbody.innerHTML=slice.map(e=>{
+        const s=parseInt(e.score||0);
+        const sc=scoreClass(s);
+        const t=e.intel_type||'—';
+        const a=truncate(e.actor_v2||'—',20);
+        const titleText=esc(truncate(e.title||'—',100));
+        const titleData=encodeURIComponent(String(e.title||''));
+        const chips=[
+            ['استراتيجي',e.intel_type],
+            ['تكتيكي',e.tactical_level],
+            ['المنطقة',e.region],
+            ['الفاعل',e.actor_v2],
+            ['الهدف',e.target_v2],
+            ['السياق',e.context_actor],
+            ['النية',e.intent],
+            ['السلاح',e.weapon_v2]
+        ].filter(x=>x[1] && String(x[1]).trim() && String(x[1]).trim()!=='غير محدد' && String(x[1]).trim()!=='â€”')
+         .map(x=>'<span class="sod-cd-mini-chip"><b>'+esc(x[0])+':</b> '+esc(truncate(String(x[1]),34))+'</span>').join('');
+        return '<tr><td style="font-size:11px;color:#5a7a9a;white-space:nowrap;">'+fmt(e.event_timestamp)+'</td><td><span class="sod-cd-score-badge '+sc+'">'+s+'</span></td><td style="font-size:10px;color:#9db4c8;">'+esc(truncate(e.intent||'—',18))+'</td><td style="color:#c8dff2;max-width:320px;"><a href="#" class="sod-cd-title-link" data-related="'+titleData+'" onclick="event.preventDefault();window[\'sodCdRelated_'+UID+'\'](decodeURIComponent(this.dataset.related||\'\'))">'+titleText+'</a>'+(chips?'<div class="sod-cd-meta-stack">'+chips+'</div>':'')+'</td><td style="font-size:11px;">'+esc(truncate(e.region||'—',15))+'</td><td style="font-size:10px;color:#5a7a9a;">'+esc(truncate(e.tactical_level||t,12))+'</td></tr>';
+    }).join('');
+    if(pgWrap){let pgHtml='';for(let i=1;i<=Math.min(pages,10);i++){pgHtml+='<button class="sod-cd-pg-btn '+(i===currentPage?'active':'')+'" onclick="sodCdPage_'+UID+'('+i+')">'+i+'</button>';}if(pages>10)pgHtml+='<span style="color:#5a7a9a;font-size:11px;padding:0 6px;">… '+pages+' صفحة</span>';pgWrap.innerHTML=pgHtml;}
+}
 
 function renderBrief(s,events){
     const body=$e('brief-body');if(!body)return;
@@ -12008,6 +12486,8 @@ if (!function_exists('so_add_ultimate_features')) {
                 }
             }
             function addAIAnalysisToNews() {
+                document.querySelectorAll('.so-ai-btn').forEach(btn => btn.remove());
+                return;
                 document.querySelectorAll('.sod-news-card, .sod-feed-table tbody tr').forEach(card => {
                     if (card.querySelector('.so-ai-btn')) return;
                     const btn = document.createElement('button');
@@ -12028,6 +12508,9 @@ if (!function_exists('so_add_ultimate_features')) {
             }
             setInterval(addAIAnalysisToNews, 5000);
             setTimeout(addAIAnalysisToNews, 4000);
+            addAIAnalysisToNews = function() {
+                document.querySelectorAll('.so-ai-btn').forEach(btn => btn.remove());
+            };
 
             // ============================================================
             // 10. طائرة بدون طيار (مسارات على الخريطة)
@@ -13091,6 +13574,28 @@ add_shortcode('osint_dashboard', function(){
     return do_shortcode('[osint_command_center]');
 });
 
+function sod_prune_legacy_dashboard_shortcodes(): void {
+    foreach ([
+        'sod_command_deck',
+        'beiruttime_command_center',
+        'strategic_osint_v7_brief',
+        'osint_dashboard',
+        'osint_dashboard_main',
+        'osint_map',
+        'osint_command_center',
+        'osint_exec_report',
+        'osint_engine_status',
+        'osint_ai_report',
+        'osint_threat_ai',
+        'sod_news_ticker',
+        'beiruttime_news_ticker',
+        'sod_top_breaking'
+    ] as $tag) {
+        remove_shortcode($tag);
+    }
+}
+add_action('init', 'sod_prune_legacy_dashboard_shortcodes', 999);
+
 
 // ==========================================================================
 //  AI Predictive + Early Warning + Instant Alerts
@@ -13235,8 +13740,8 @@ function so_ai_report($events) {
 }
 }
 
-if (!function_exists('so_early_warning_engine')) {
-function so_early_warning_engine($events) {
+if (!function_exists('so_basic_early_warning_engine')) {
+function so_basic_early_warning_engine($events) {
     $score_total = 0;
     $military = 0;
     $recent_spike = 0;
@@ -13300,7 +13805,7 @@ add_shortcode('osint_alert', function(){
     ", ARRAY_A);
 
     if (!$rows) return "لا توجد بيانات";
-    $alert = so_early_warning_engine($rows);
+    $alert = so_basic_early_warning_engine($rows);
 
     ob_start(); ?>
     <div style="background:#0f172a;color:#fff;padding:20px;border-radius:12px">
@@ -14252,4 +14757,3 @@ function so_ma_admin_footer_panel() {
 }
 add_action('admin_footer', 'so_ma_admin_footer_panel', 99);
 }
-
