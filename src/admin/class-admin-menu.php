@@ -26,11 +26,9 @@ class AdminMenu {
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         
         // AJAX handlers لإعادة التحليل والإحصائيات
-        if (wp_doing_ajax()) {
-            add_action('wp_ajax_so_ajax_reanalyze_batch', [$this, 'handle_full_reanalysis']);
-            add_action('wp_ajax_so_ajax_reanalyze_reset', [$this, 'handle_reanalyze_reset']);
-            add_action('wp_ajax_beiruttime_get_stats', [$this, 'handle_get_stats']);
-        }
+        add_action('wp_ajax_so_ajax_reanalyze_batch', [$this, 'handle_full_reanalysis']);
+        add_action('wp_ajax_so_ajax_reanalyze_reset', [$this, 'handle_reanalyze_reset']);
+        add_action('wp_ajax_beiruttime_get_stats', [$this, 'handle_get_stats']);
     }
     
     /**
@@ -297,6 +295,23 @@ class AdminMenu {
         <?php
     }
     
+    /**
+     * معالجة تصفير المؤشر (AJAX)
+     */
+    public function handle_reanalyze_reset() {
+        check_ajax_referer('so_reanalyze_action', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'غير مصرح']);
+            return;
+        }
+
+        // تصفير أي مؤشر تخزين مؤقت
+        delete_option('beiruttime_osint_reanalyze_offset');
+        
+        wp_send_json_success(['message' => 'تم تصفير المؤشر بنجاح']);
+    }
+
     /**
      * معالجة إعادة التحليل الكامل (AJAX)
      */

@@ -162,6 +162,96 @@ class AjaxHandlers {
     }
 
     /**
+     * معالجة دفعة إعادة التحليل (AJAX Batch)
+     */
+    public function handle_reanalyze_batch() {
+        // التحقق من الصلاحيات
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('غير مصرح لك.', 'beiruttime-osint-pro')]);
+        }
+        
+        // التحقق من Nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'so_reanalyze_action')) {
+            wp_send_json_error(['message' => __('رمز الأمان غير صحيح.', 'beiruttime-osint-pro')]);
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'so_newslog';
+        
+        // التحقق من وجود الجدول
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            wp_send_json_error(['message' => __('جدول الأخبار غير موجود.', 'beiruttime-osint-pro')]);
+        }
+
+        $batch_size = isset($_POST['batch']) ? intval($_POST['batch']) : 50;
+        $offset = get_option('so_reanalyze_batch_position', 0);
+        
+        // جلب دفعة من الأخبار
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM $table_name ORDER BY id ASC LIMIT %d OFFSET %d",
+                $batch_size,
+                $offset
+            )
+        );
+
+        if (empty($rows)) {
+            // اكتملت المعالجة
+            delete_option('so_reanalyze_batch_position');
+            wp_send_json_success([
+                'done' => true,
+                'processed' => $offset,
+                'total' => $wpdb->get_var("SELECT COUNT(*) FROM $table_name"),
+                'updated' => 0,
+                'message' => __('اكتمل إعادة التحليل.', 'beiruttime-osint-pro')
+            ]);
+            return;
+        }
+
+        // معالجة الدفعة
+        $updated_count = 0;
+        $classifier = Classifier::getInstance();
+        
+        foreach ($rows as $row) {
+            try {
+                $text = $row->title . ' ' . $row->content;
+                
+                // استخراج الجهة الفاعلة
+                $actor = $classifier->extractNamedNonMilitaryActor($text);
+                
+                if ($actor && $actor !== $row->actor) {
+                    $wpdb->update(
+                        $table_name,
+                        ['actor' => $actor],
+                        ['id' => $row->id]
+                    );
+                    $updated_count++;
+                }
+            } catch (\Exception $e) {
+                error_log('OSINT Batch Error for row ' . $row->id . ': ' . $e->getMessage());
+            }
+        }
+
+        // تحديث الموقع
+        $new_position = $offset + count($rows);
+        update_option('so_reanalyze_batch_position', $new_position);
+        
+        $total = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+        $percent = $total > 0 ? round(($new_position / $total) * 100, 2) : 0;
+
+        wp_send_json_success([
+            'done' => false,
+            'processed' => $new_position,
+            'total' => $total,
+            'updated' => $updated_count,
+            'next_offset' => $new_position,
+            'batch' => $batch_size,
+            'percent' => $percent,
+            'message' => sprintf(__('جاري المعالجة... %d من %d', 'beiruttime-osint-pro'), $new_position, $total)
+        ]);
+    }
+
+    /**
      * معالجة الحصول على إحصائيات قاعدة البيانات
      */
     public function handle_get_stats() {
