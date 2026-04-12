@@ -7706,15 +7706,12 @@ class SO_Admin_UI {
     }
 
     public static function enqueue_admin_assets($hook) {
+        // Load fonts and basic styles for all plugin pages
         if (strpos($hook, 'beiruttime-osint') === false && strpos($hook, 'strategic-osint') === false) return;
-        wp_enqueue_style('so-admin-font', 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap', [], null);
-        $page = sanitize_text_field($_GET['page'] ?? '');
         
-        // Fix: Prevent loading problematic scripts on reports page
-        if ($page === 'strategic-osint-reports') {
-            // Only load minimal assets for reports page - no heavy JS
-            return;
-        }
+        wp_enqueue_style('so-admin-font', 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap', [], null);
+        
+        $page = sanitize_text_field($_GET['page'] ?? '');
         
         // Load assets for dashboards and db pages
         if ($page === 'strategic-osint-dashboards' || $page === 'strategic-osint-db') {
@@ -7769,6 +7766,9 @@ class SO_Admin_UI {
                     'nonce' => wp_create_nonce('so_ajax_v13'),
                 ]);
             }
+        } elseif ($page === 'strategic-osint-reports') {
+            // Load minimal scripts for reports page (jQuery for AJAX send button)
+            wp_enqueue_script('jquery');
         }
     }
 
