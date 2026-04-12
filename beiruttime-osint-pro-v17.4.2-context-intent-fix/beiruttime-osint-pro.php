@@ -7716,6 +7716,18 @@ class SO_Admin_UI {
             return;
         }
         
+        // Load assets for dashboards and db pages
+        if ($page === 'strategic-osint-dashboards' || $page === 'strategic-osint-db') {
+            $admin_css = __DIR__ . '/assets/css/admin-pages.css';
+            wp_enqueue_style(
+                'sod-admin-pages',
+                plugins_url('assets/css/admin-pages.css', __FILE__),
+                [],
+                file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
+            );
+            wp_enqueue_script('jquery');
+        }
+        
         if ($page === 'strategic-osint-newslog') {
             $admin_css = __DIR__ . '/assets/css/admin-pages.css';
             wp_enqueue_style(
@@ -7728,7 +7740,7 @@ class SO_Admin_UI {
             wp_enqueue_script(
                 'sod-newslog-admin',
                 plugins_url('assets/js/newslog-admin.js', __FILE__),
-                [],
+                ['jquery'],
                 file_exists($newslog_js) ? (string) filemtime($newslog_js) : '1.0.0',
                 true
             );
@@ -7743,25 +7755,20 @@ class SO_Admin_UI {
                 ],
             ]);
         } elseif ($page === 'strategic-osint-db') {
-            $admin_css = __DIR__ . '/assets/css/admin-pages.css';
-            wp_enqueue_style(
-                'sod-admin-pages',
-                plugins_url('assets/css/admin-pages.css', __FILE__),
-                [],
-                file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
-            );
             $db_admin_js = __DIR__ . '/assets/js/db-admin.js';
-            wp_enqueue_script(
-                'sod-db-admin',
-                plugins_url('assets/js/db-admin.js', __FILE__),
-                [],
-                file_exists($db_admin_js) ? (string) filemtime($db_admin_js) : '1.0.0',
-                true
-            );
-            wp_localize_script('sod-db-admin', 'sodDbAdminConfig', [
-                'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('so_ajax_v13'),
-            ]);
+            if (file_exists($db_admin_js)) {
+                wp_enqueue_script(
+                    'sod-db-admin',
+                    plugins_url('assets/js/db-admin.js', __FILE__),
+                    ['jquery'],
+                    file_exists($db_admin_js) ? (string) filemtime($db_admin_js) : '1.0.0',
+                    true
+                );
+                wp_localize_script('sod-db-admin', 'sodDbAdminConfig', [
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce('so_ajax_v13'),
+                ]);
+            }
         }
     }
 
