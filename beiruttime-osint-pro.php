@@ -13738,7 +13738,7 @@ add_action('init', function() {
 // 25. إضافات عصرية وتجربة مستخدم محسّنة (آمنة للإضافة في أي وقت)
 // ==========================================================================
 if (!function_exists('so_add_modern_enhancements')) {
-    add_action('wp_footer', 'so_add_modern_enhancements');
+    // add_action disabled: wp_footer so_add_modern_enhancements');
     function so_add_modern_enhancements() {
         if (!sod_should_inject_frontend_ui()) return;
         ?>
@@ -14026,7 +14026,7 @@ if (!function_exists('so_add_modern_enhancements')) {
 // 26. إشعارات فورية وتنبيهات للمستخدم (Toasts + Desktop Notifications)
 // ==========================================================================
 if (!function_exists('so_add_live_notifications')) {
-    add_action('wp_footer', 'so_add_live_notifications');
+    // add_action disabled: wp_footer so_add_live_notifications');
     function so_add_live_notifications() {
         if (is_admin()) return;
         // إيقاف الإشعارات في الصفحة الرئيسية - تعمل فقط في لوحة العرض المستقلة
@@ -14356,7 +14356,7 @@ if (!function_exists('so_add_live_notifications')) {
 // 27. الميزات الخارقة والعصرية المتكاملة V1.0 (إشعارات، نيون، كرة أرضية، صوت، ذكاء اصطناعي، TV Mode)
 // ==========================================================================
 if (!function_exists('so_add_ultimate_features')) {
-    add_action('wp_footer', 'so_add_ultimate_features');
+    // add_action disabled: wp_footer so_add_ultimate_features');
     function so_add_ultimate_features() {
         if (is_admin()) return;
         // إيقاف الميزات الخارقة في الصفحة الرئيسية - تعمل فقط في لوحة العرض المستقلة
@@ -14957,127 +14957,10 @@ if (!function_exists('sod_render_news_ticker_only')) {
 }
 
 if (!function_exists('so_disable_tv_mode_and_bottom_notices')) {
-    add_action('wp_footer', 'so_disable_tv_mode_and_bottom_notices', 99999);
+    // تم تعطيل هذا الإجراء لمنع الإشعارات والتشويش على الواجهة الأمامية
+    // add_action('wp_footer', 'so_disable_tv_mode_and_bottom_notices', 99999);
     function so_disable_tv_mode_and_bottom_notices() {
-        if (is_admin()) return;
-        // تم التعديل: تطبيق التعطيل على جميع الصفحات العامة لمنع التشويه
-        // إذا كانت صفحة لوحة العرض أو تحتوي على shortcode خاص باللوحة، لا تعطل شيئاً
-        if (sod_is_dashboard_route() || sod_should_inject_frontend_ui()) return;
-        ?>
-        <style id="so-disable-tv-mode-and-bottom-notices">
-            body.so-tv-mode{background:inherit !important;}
-            .so-tv-toggle,
-            .sod-bottom-alert,
-            .sod-live-alert,
-            .sod-alert-bar,
-            .sod-tv-bar,
-            .sod-tv-mode,
-            .so-floating-news-counter,
-            .so-news-counter-toast,
-            .so-splash,
-            .so-toast,
-            .so-progress-bar,
-            [class*="osint-notification"],
-            [id*="osint-notification"],
-            .osint-notice,
-            .so-browser-notifier {
-                display:none !important;
-                opacity:0 !important;
-                visibility:hidden !important;
-                pointer-events:none !important;
-            }
-        </style>
-        <script>
-        (function(){
-            'use strict';
-
-            function removeBottomNotices(root){
-                var scope = root || document;
-                var selectors = [
-                    '.so-tv-toggle',
-                    '.sod-bottom-alert',
-                    '.sod-live-alert',
-                    '.sod-alert-bar',
-                    '.sod-tv-bar',
-                    '.so-floating-news-counter',
-                    '.so-news-counter-toast',
-                    '.so-splash',
-                    '.so-toast',
-                    '.so-progress-bar',
-                    '[class*="osint-notification"]',
-                    '[id*="osint-notification"]',
-                    '.osint-notice',
-                    '.so-browser-notifier'
-                ];
-                try {
-                    scope.querySelectorAll(selectors.join(',')).forEach(function(el){
-                        if (el) el.remove();
-                    });
-                } catch(e) {}
-
-                document.body && document.body.classList.remove('so-tv-mode');
-
-                try {
-                    localStorage.setItem('so_tv_mode', '0');
-                    localStorage.setItem('so_tv_mode_enabled', '0');
-                } catch(e) {}
-
-                try {
-                    document.querySelectorAll('.so-toast').forEach(function(toast){
-                        var txt = (toast.textContent || '').trim();
-                        if (/هناك|هنالك|زيادة في الأحداث الحرجة|أحداث حرجة|أخبار جديدة|خبر جديد/.test(txt)) {
-                            toast.remove();
-                        }
-                    });
-                } catch(e) {}
-            }
-
-            removeBottomNotices();
-
-            document.addEventListener('DOMContentLoaded', function(){
-                removeBottomNotices();
-                setTimeout(removeBottomNotices, 400);
-                setTimeout(removeBottomNotices, 1500);
-            });
-
-            var mo = new MutationObserver(function(mutations){
-                mutations.forEach(function(m){
-                    if (m.addedNodes && m.addedNodes.length) {
-                        m.addedNodes.forEach(function(node){
-                            if (node && node.nodeType === 1) {
-                                removeBottomNotices(node);
-                            }
-                        });
-                    }
-                });
-            });
-
-            if (document.documentElement) {
-                mo.observe(document.documentElement, {childList:true, subtree:true});
-            }
-
-            // اعتراض XMLHttpRequest لمنع طلبات الإشعارات في الصفحة الرئيسية
-            if (window.XMLHttpRequest) {
-                var originalOpen = XMLHttpRequest.prototype.open;
-                XMLHttpRequest.prototype.open = function(method, url) {
-                    if (typeof url === 'string' && url.indexOf('admin-ajax.php') !== -1) {
-                        this.addEventListener('readystatechange', function() {
-                            if (this.readyState === 4) {
-                                try {
-                                    var response = JSON.parse(this.responseText);
-                                    if (response && (response.action === 'so_scan_treats' || response.scan_treats)) {
-                                        console.log('[OSINT] Blocked notification request on frontend');
-                                    }
-                                } catch(e) {}
-                            }
-                        });
-                    }
-                    return originalOpen.apply(this, arguments);
-                };
-            }
-        })();
-        </script>
-        <?php
+        return; // دالة فارغة لمنع أي إخراج
     }
 }
 
