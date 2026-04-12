@@ -29,6 +29,11 @@ class AjaxHandlers {
         
         // الحصول على إحصائيات قاعدة البيانات
         add_action('wp_ajax_so_get_db_stats', [$this, 'handle_get_db_stats']);
+        
+        // معالجة الدفعات (Batches) لإعادة التحليل
+        add_action('wp_ajax_so_ajax_reanalyze_batch', [$this, 'handle_reanalyze_batch']);
+        add_action('wp_ajax_so_ajax_reanalyze_reset', [$this, 'handle_reanalyze_reset']);
+        add_action('wp_ajax_beiruttime_get_stats', [$this, 'handle_get_stats']);
     }
     
     /**
@@ -140,35 +145,57 @@ class AjaxHandlers {
             'failed_count' => $prev_failed + $failed_count
         ]);
     }
-    
     /**
-     * معالجة الحصول على إحصائيات قاعدة البيانات
+     * معالجة تصفير مؤشر إعادة التحليل
      */
-    public function handle_get_db_stats() {
+    public function handle_reanalyze_reset() {
         // التحقق من الصلاحيات
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('غير مصرح لك.', 'beiruttime-osint-pro')]);
         }
-        
+
+        delete_option('so_reanalyze_batch_position');
+        delete_option('so_reanalyze_batch_success');
+        delete_option('so_reanalyze_batch_failed');
+
+        wp_send_json_success(['message' => __('تم تصفير المؤشر بنجاح.', 'beiruttime-osint-pro')]);
+    }
+
+    /**
+     * معالجة الحصول على إحصائيات قاعدة البيانات
+     */
+    public function handle_get_stats() {
+        // التحقق من الصلاحيات
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('غير مصرح لك.', 'beiruttime-osint-pro')]);
+        }
+
         global $wpdb;
-        
+
+        $stats = [];
+
+        // إحصائيات المقالات
         $total_posts = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'post' AND post_status = 'publish'"
         );
-        
-        $classified = $wpdb->get_var(
-            "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p
-             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-             WHERE p.post_type = 'post' AND p.post_status = 'publish'
-             AND pm.meta_key = '_osint_classification'"
-        );
-        
-        $unclassified = $total_posts - $classified;
-        
-        wp_send_json_success([
-            'total_posts' => intval($total_posts),
-            'classified' => intval($classified),
-            'unclassified' => intval($unclassified)
-        ]);
+        $stats['total_posts'] = intval($total_posts);
+
+        // إحصائيات جدول التنبؤات
+        $table_name = $wpdb->prefix . 'so_predictions';
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") == $table_name) {
+            $predictions_count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+            $stats['predictions_count'] = intval($predictions_count);
+        } else {
+            $stats['predictions_count'] = 0;
+        }
+
+        wp_send_json_success($stats);
+    }
+
+    /**
+     * معالجة الحصول على إحصائيات قاعدة البيانات (الاسم القديم للتوافق)
+     */
+    public function handle_get_db_stats() {
+        return $this->handle_get_stats();
     }
 }
