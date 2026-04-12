@@ -1,0 +1,57 @@
+```
+# Project-specific build artifacts
+beiruttime-osint-pro-v17.4.2-context-intent-fix/
+
+# Dependencies
+vendor/
+node_modules/
+composer.lock
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.coverage
+coverage/
+htmlcov/
+
+# Build and distribution
+dist/
+build/
+*.egg-info/
+target/
+.gradle/
+bin/
+obj/
+
+# Temp files
+*.tmp
+*.temp
+*~
+```
+
+Wait, I need to reconsider this. Looking at the input again, there's only one modified PHP file and no build artifacts, temporary files, or dependency directories in the changes. This appears to be just a source code modification.
+
+```
+
+```

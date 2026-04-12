@@ -3738,7 +3738,7 @@ function sod_calc_gci(array $region_scores, int $critical, int $total_score): in
 }
 
 function sod_empty_analytics(): array {
-    return ['total'=>0,'critical'=>0,'avg_score'=>0,'total_score'=>0,'hot_region'=>'','regions'=>[],'region_scores'=>[],'actors'=>[],'intel_types'=>[],'levels'=>[],'hourly'=>[],'truth_layers'=>[],'war_directions'=>[],'escalation_index'=>0,'deception_index'=>0,'gci'=>0];
+    return ['total'=>0,'critical'=>0,'avg_score'=>0,'total_score'=>0,'hot_region'=>'','regions'=>[],'region_scores'=>[],'actors'=>[],'intel_types'=>[],'levels'=>[],'hourly'=>[],'truth_layers'=>['field_action'=>0,'statement'=>0,'report'=>0,'defensive_alert'=>0,'rumor'=>0,'general'=>0],'war_directions'=>['escalating'=>0,'de-escalating'=>0,'aftermath'=>0,'stable_or_unclear'=>0],'escalation_index'=>0,'deception_index'=>0,'gci'=>0];
 }
 
 function sod_get_score_color(int $score): string {
