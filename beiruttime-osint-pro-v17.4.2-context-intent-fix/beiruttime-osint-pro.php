@@ -15538,14 +15538,6 @@ function so_ma_admin_footer_panel() {
     </script>';
 }
 add_action('admin_footer', 'so_ma_admin_footer_panel', 99);
-}
-<?php
-/**
- * ملف إصلاح دوال AJAX الناقصة لسجل الأخبار وبنوك المعلومات
- * يضاف هذا الكود في نهاية ملف beiruttime-osint-pro.php
- */
-
-if (!defined('ABSPATH')) exit;
 
 // ==========================================================================
 // دوال AJAX الناقصة لسجل الأخبار - News Log AJAX Handlers
