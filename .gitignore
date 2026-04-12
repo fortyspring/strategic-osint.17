@@ -1,1 +1,46 @@
-(beiruttime-osint-pro-v17.4.2-context-intent-fix/)
+```
+# Project-specific build artifacts
+beiruttime-osint-pro-v*.tar.gz
+beiruttime-osint-pro-v*.zip
+
+# Dependencies
+vendor/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Compressed files
+*.zip
+*.tar
+*.gz
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+```

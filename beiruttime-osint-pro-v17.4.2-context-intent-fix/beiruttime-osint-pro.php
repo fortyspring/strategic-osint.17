@@ -7706,15 +7706,20 @@ class SO_Admin_UI {
     }
 
     public static function enqueue_admin_assets($hook) {
-        // Load fonts and basic styles for all plugin pages
+        // Load fonts and basic styles for all plugin pages - CRITICAL FIX
         if (strpos($hook, 'beiruttime-osint') === false && strpos($hook, 'strategic-osint') === false) return;
         
+        // Always load fonts first to prevent rendering issues
         wp_enqueue_style('so-admin-font', 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap', [], null);
         
-        $page = sanitize_text_field($_GET['page'] ?? '');
+        // Get page safely with default
+        $page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : '';
         
-        // Load assets for dashboards and db pages
-        if ($page === 'strategic-osint-dashboards' || $page === 'strategic-osint-db') {
+        // ALWAYS load jQuery for ALL pages to ensure AJAX and UI work
+        wp_enqueue_script('jquery');
+        
+        // Load CSS for dashboards, db, newslog pages
+        if (in_array($page, ['strategic-osint-dashboards', 'strategic-osint-db', 'strategic-osint-newslog', 'strategic-osint-reports', 'strategic-osint-banks'])) {
             $admin_css = __DIR__ . '/assets/css/admin-pages.css';
             wp_enqueue_style(
                 'sod-admin-pages',
@@ -7722,36 +7727,33 @@ class SO_Admin_UI {
                 [],
                 file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
             );
-            wp_enqueue_script('jquery');
         }
         
+        // Newslog page scripts
         if ($page === 'strategic-osint-newslog') {
-            $admin_css = __DIR__ . '/assets/css/admin-pages.css';
-            wp_enqueue_style(
-                'sod-admin-pages',
-                plugins_url('assets/css/admin-pages.css', __FILE__),
-                [],
-                file_exists($admin_css) ? (string) filemtime($admin_css) : '1.0.0'
-            );
             $newslog_js = __DIR__ . '/assets/js/newslog-admin.js';
-            wp_enqueue_script(
-                'sod-newslog-admin',
-                plugins_url('assets/js/newslog-admin.js', __FILE__),
-                ['jquery'],
-                file_exists($newslog_js) ? (string) filemtime($newslog_js) : '1.0.0',
-                true
-            );
-            wp_localize_script('sod-newslog-admin', 'sodNewslogConfig', [
-                'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonces' => [
-                    'search' => wp_create_nonce('sod_newslog_search'),
-                    'save' => wp_create_nonce('sod_newslog_save'),
-                    'reclassify' => wp_create_nonce('sod_newslog_reclassify'),
-                    'bulk' => wp_create_nonce('sod_newslog_bulk'),
-                    'bank' => wp_create_nonce('sod_newslog_save'),
-                ],
-            ]);
-        } elseif ($page === 'strategic-osint-db') {
+            if (file_exists($newslog_js)) {
+                wp_enqueue_script(
+                    'sod-newslog-admin',
+                    plugins_url('assets/js/newslog-admin.js', __FILE__),
+                    ['jquery'],
+                    file_exists($newslog_js) ? (string) filemtime($newslog_js) : '1.0.0',
+                    true
+                );
+                wp_localize_script('sod-newslog-admin', 'sodNewslogConfig', [
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'nonces' => [
+                        'search' => wp_create_nonce('sod_newslog_search'),
+                        'save' => wp_create_nonce('sod_newslog_save'),
+                        'reclassify' => wp_create_nonce('sod_newslog_reclassify'),
+                        'bulk' => wp_create_nonce('sod_newslog_bulk'),
+                        'bank' => wp_create_nonce('sod_newslog_save'),
+                    ],
+                ]);
+            }
+        } 
+        // DB page scripts
+        elseif ($page === 'strategic-osint-db') {
             $db_admin_js = __DIR__ . '/assets/js/db-admin.js';
             if (file_exists($db_admin_js)) {
                 wp_enqueue_script(
@@ -7766,9 +7768,28 @@ class SO_Admin_UI {
                     'nonce' => wp_create_nonce('so_ajax_v13'),
                 ]);
             }
-        } elseif ($page === 'strategic-osint-reports') {
-            // Load minimal scripts for reports page (jQuery for AJAX send button)
-            wp_enqueue_script('jquery');
+        } 
+        // Reports page - ensure it loads properly
+        elseif ($page === 'strategic-osint-reports') {
+            // Reports page needs jQuery for AJAX send button - already loaded above
+            // Add any report-specific scripts here if needed
+        }
+        // Banks page scripts
+        elseif ($page === 'strategic-osint-banks') {
+            $banks_js = __DIR__ . '/assets/js/banks-admin.js';
+            if (file_exists($banks_js)) {
+                wp_enqueue_script(
+                    'sod-banks-admin',
+                    plugins_url('assets/js/banks-admin.js', __FILE__),
+                    ['jquery'],
+                    file_exists($banks_js) ? (string) filemtime($banks_js) : '1.0.0',
+                    true
+                );
+                wp_localize_script('sod-banks-admin', 'sodBanksConfig', [
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce('sod_banks_nonce'),
+                ]);
+            }
         }
     }
 
