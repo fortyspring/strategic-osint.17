@@ -1,0 +1,29 @@
+{
+    "name": "beiruttime/osint-pro",
+    "description": "Beiruttime OSINT Pro - Advanced Strategic Intelligence Analysis System",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Beiruttime Team",
+            "email": "info@beiruttime.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Beiruttime\\OSINT\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"echo 'Autoloader generated successfully!\\n';\""
+        ]
+    }
+}
