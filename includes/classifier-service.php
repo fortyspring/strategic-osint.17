@@ -1,311 +1,309 @@
 <?php
+/**
+ * Classifier Service - Enhanced NLP & Auto-Reclassification
+ * Handles article classification with expanded dictionaries, grammar rules, and delayed re-processing.
+ * 
+ * @package StrategicOSINT
+ * @version 2.1.0
+ */
+
 if (!defined('ABSPATH')) exit;
 
-function sod_context_memory_infer(string $text): array {
-    $text = so_clean_text($text);
-    if ($text === '') return [];
+class SOD_Classifier_Service {
+    
+    use SOD_Singleton_Trait;
 
-    $fp = so_build_title_fingerprint($text);
-    $patterns = sod_context_memory_get();
-    $best = [];
-    $bestScore = 0.0;
+    // بنوك البيانات الموسعة (قواميس، أنماط صرفية، مرادفات)
+    private $actors_db = [];
+    private $locations_db = [];
+    private $weapons_db = [];
+    private $patterns_db = [];
 
-    foreach (array_reverse($patterns) as $entry) {
-        if (!is_array($entry)) continue;
-        $entryTitle = so_clean_text((string)($entry['title'] ?? ''));
-        if ($entryTitle === '') continue;
+    /**
+     * تهيئة الخدمة وتحميل القواميس الموسعة
+     */
+    private function __construct() {
+        $this->load_expanded_dictionaries();
+        $this->hook_reclassification_scheduler();
+    }
 
-        $score = 0.0;
-        if ($fp !== '' && !empty($entry['fingerprint']) && $fp === $entry['fingerprint']) $score += 70;
-        similar_text(so_normalize_title_for_dedupe($text), so_normalize_title_for_dedupe($entryTitle), $pct);
-        $score += ($pct / 100.0) * 40.0;
-        if (!empty($entry['actor_v2']) && in_array($entry['actor_v2'], ['فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'], true)) $score -= 35;
+    /**
+     * تحميل القواميس الموسعة (أسماء، أفعال، أنماط نحوية)
+     */
+    private function load_expanded_dictionaries() {
+        // 1. قاموس الفاعلين (موسع جداً ليشمل الألقاب، الكنى، والرموز)
+        $this->actors_db = [
+            'israeli_enemy' => [
+                'official' => 'العدو الإسرائيلي',
+                'aliases' => [
+                    'الكيان الصهيوني', 'الصهاينة', 'العدو الصهيوني', 
+                    'إسرائيل', 'الدولة العبرية', 'تل أبيب', 'الاحتلال الإسرائيلي',
+                    'الجيش الإسرائيلي', 'جيش العدو', 'قوات الاحتلال', 
+                    'العدو المتصهيّن', 'بنو صهيون', 'النظام الصهيوني',
+                    'IDF', 'Tsahal', 'Zionist Entity', 'Israeli Occupation Forces'
+                ],
+                'keywords' => ['غارة', 'قصف', 'اغتيال', 'توغّل', 'استهداف']
+            ],
+            'resistance' => [
+                'official' => 'المقاومة الإسلامية',
+                'aliases' => [
+                    'حزب الله', 'المقاومة', 'الإسلاميون', 'المجاهدون',
+                    'أنصار الله', 'محور المقاومة', 'الفصائل المسلحة',
+                    'القوة الرادعة', 'ألوية المقاومة', 'كتائب القسام',
+                    'Hezbollah', 'Axis of Resistance', 'Islamic Resistance'
+                ],
+                'keywords' => ['ردّ', 'قصْف', 'استهداف', 'عملية', 'تصدّي']
+            ],
+            'lebanese_army' => [
+                'official' => 'الجيش اللبناني',
+                'aliases' => ['القوات المسلحة اللبنانية', 'الجيش', 'ل.ج', 'LAF'],
+                'keywords' => ['انتشار', 'تمركز', 'أوقف', 'اعتقل']
+            ],
+            'unifil' => [
+                'official' => 'اليونيفيل',
+                'aliases' => ['قوات الطوارئ الدولية', 'القوات الدولية', 'بلو بيريت'],
+                'keywords' => ['دورية', 'انسحاب', 'مراقبة']
+            ],
+            'usa' => [
+                'official' => 'الولايات المتحدة الأمريكية',
+                'aliases' => ['أمريكا', 'واشنطن', 'الإدارة الأمريكية', 'البيت الأبيض', 'الأسطول الأمريكي'],
+                'keywords' => ['دعم', 'غطاء', 'تحذير', 'وساطة']
+            ]
+        ];
 
-        if ($score > $bestScore) {
-            $bestScore = $score;
-            $best = $entry;
+        // 2. أنماط نحوية وصرفية متقدمة (Regex Patterns)
+        $this->patterns_db = [
+            // نمط: فعل + فاعل (مثال: قصفت إسرائيل...)
+            'verb_actor' => '/(?:قام|شنّ|نفّذ|أقدم|باشر|شرع|بدأ)\s+(?:بـ)?\s*(?:قصف|غارة|هجوم|اغتيال|توغّل)\s+(?:من\s+)?(?:قبل\s+)?(ال[\w\s]+|إسرائيل|حزب الله|أمريكا)/u',
+            
+            // نمط: فاعل + فعل (مثال: الجيش الإسرائيلي يقصف...)
+            'actor_verb' => '/(ال[\w\s]+(?:الجيش|القوات|ألوية|كتائب)|إسرائيل|حزب الله|أمريكا|واشنطن|تل أبيب)\s+(?:يقوم|يقصف|يستهدف|يغتال|يُنفّذ|شنّ)/u',
+            
+            // نمط: نسبة الفعل (مثال: نسب الهجوم إلى...)
+            'attribution' => '/(?:نسب|أرجع|حمّل)\s+(?:المسؤولية|الهجوم)\s+(?:إلى|لـ)\s+(ال[\w\s]+|إسرائيل|حزب الله)/u',
+            
+            // نمط: أدوات الاستثناء والتأكيد (لتصفية الضوضاء)
+            'negation' => '/(?:لم|لن|لا|غير|بدون)\s+(?:تثبت|يؤكد|يصدر)/u'
+        ];
+
+        // 3. قاموس المواقع (لتحديد السياق الجغرافي للفاعل)
+        $this->locations_db = [
+            'south_lebanon' => ['الجنوب', 'النبطية', 'صور', 'مرجعيون', 'حاصبيا', 'الضاحية الجنوبية'],
+            'north_israel' => ['الجليل', 'صفد', 'حيفا', 'كريات شمونة', 'مستوطنات الشمال'],
+            'bekaa' => ['البقاع', 'بعلبك', 'الهرمل', 'راشيا']
+        ];
+    }
+
+    /**
+     * ربط جدولة إعادة التصنيف التلقائي
+     */
+    private function hook_reclassification_scheduler() {
+        // جدولة حدث لإعادة التصنيف بعد 3 دقائق من النشر
+        add_action('sod_scheduled_reclassify', [$this, 'process_delayed_reclassification'], 10, 1);
+        
+        // عند نشر مقال جديد، نؤجل التصنيف الدقيق لمدة 3 دقائق
+        add_action('transition_post_status', function($new_status, $old_status, $post) {
+            if ($new_status === 'publish' && $old_status !== 'publish') {
+                // جدولة الحدث بعد 180 ثانية (3 دقائق)
+                wp_schedule_single_event(time() + 180, 'sod_scheduled_reclassify', [$post->ID]);
+            }
+        }, 10, 3);
+    }
+
+    /**
+     * المعالجة المؤجلة (بعد دقائق من النشر)
+     * هذه الدالة تضمن أخذ "الفاعل الحقيقي" حتى لو فشل التصنيف الأولي
+     */
+    public function process_delayed_reclassification($post_id) {
+        // منع التنفيذ المتكرر
+        if (get_post_meta($post_id, '_sod_deep_classified', true)) {
+            return;
+        }
+
+        $post = get_post($post_id);
+        if (!$post) return;
+
+        // تجميع النص الكامل (عنوان + محتوى + مقتطف)
+        $full_text = $post->post_title . ' ' . $post->post_content . ' ' . $post->post_excerpt;
+        
+        // تنفيذ التصنيف العميق
+        $result = $this->analyze_text_deeply($full_text);
+
+        // منطق التحديث: إذا كانت الثقة عالية (>85%) أو إذا كان الفاعل الحالي غير دقيق
+        $current_actor = get_post_meta($post_id, 'sod_event_actor', true);
+        $new_actor = $result['actor'] ?? '';
+        $confidence = $result['confidence'] ?? 0;
+
+        $should_update = false;
+        $reason = '';
+
+        // 1. إذا لم يكن هناك فاعل أصلاً
+        if (empty($current_actor) && !empty($new_actor)) {
+            $should_update = true;
+            $reason = 'filling_empty';
+        } 
+        // 2. إذا كان الفاعل الحالي عاماً جداً والجديد محدد (مثلاً "عدو" -> "العدو الإسرائيلي")
+        elseif ($this->is_generic_actor($current_actor) && $this->is_specific_actor($new_actor)) {
+            $should_update = true;
+            $reason = 'upgrading_specificity';
+        }
+        // 3. إذا كانت درجة الثقة عالية جداً (>90%) نتجاوز أي حماية
+        elseif ($confidence >= 90) {
+            $should_update = true;
+            $reason = 'high_confidence_override';
+        }
+
+        if ($should_update && !empty($new_actor)) {
+            update_post_meta($post_id, 'sod_event_actor', sanitize_text_field($new_actor));
+            update_post_meta($post_id, 'sod_classification_confidence', intval($confidence));
+            update_post_meta($post_id, 'sod_classification_reason', $reason);
+            update_post_meta($post_id, '_sod_deep_classified', true); // علامة لمنع التكرار
+            
+            // تحديث البنوك الإحصائية
+            $this->update_stats_banks($post_id, $result);
+            
+            error_log("SOD OSINT: Deep reclassification for Post #{$post_id}. Actor: {$new_actor} (Conf: {$confidence}%). Reason: {$reason}");
+        } else {
+            // حتى لو لم يحدث تغيير، نضع العلامة لإنهاء الجدولة
+            update_post_meta($post_id, '_sod_deep_classified', true);
         }
     }
 
-    if ($bestScore < 60 || empty($best['actor_v2'])) return [];
+    /**
+     * التحليل العميق للنص باستخدام القواميس الموسعة والأنماط
+     */
+    private function analyze_text_deeply($text) {
+        $clean_text = $this->normalize_text($text);
+        $scores = [];
 
-    return [
-        'primary_actor' => (string)$best['actor_v2'],
-        'secondary_actor' => '',
-        'target' => '',
-        'confidence' => min(98, (int)round($bestScore)),
-        'reason' => 'context-memory-match',
-        'actor_matches' => [],
-    ];
-}
+        // 1. البحث عن تطابقات مباشرة في قاموس الفاعلين
+        foreach ($this->actors_db as $actor_key => $data) {
+            $score = 0;
+            $matches = [];
 
-function sod_extract_named_nonmilitary_actor(string $text): string {
-    $text = so_clean_text($text);
-    if ($text === '') return '';
+            // فحص الاسم الرسمي
+            if (mb_stripos($clean_text, $data['official']) !== false) {
+                $score += 40;
+                $matches[] = 'official';
+            }
 
-    $patterns = [
-        'الخارجية الإيرانية' => '/(الخارجية الإيرانية|وزارة الخارجية الإيرانية|عراقجي|وزير الخارجية الايراني|وزير الخارجية الإيراني)/ui',
-        'البيت الأبيض' => '/(البيت الأبيض|البيت الابيض|مسؤول أمريكي|مسؤول أميركي|نائب الرئيس الأميركي|نائب الرئيس الأمريكي)/ui',
-        'الولايات المتحدة' => '/(ترامب|ترمب|واشنطن|الرئاسة الأميركية|الإدارة الأميركية|الادارة الاميركية|وفد أمريكي|الوفد الأمريكي|قائد سنتكوم|سنتكوم)/ui',
-        'الحكومة الإيرانية' => '/(الحكومة الإيرانية|المتحدثة باسم الحكومة الإيرانية|المتحدث باسم الحكومة الإيرانية)/ui',
-        'الرئاسة الإيرانية' => '/(الرئاسة الإيرانية|الرئاسة:\s*الرئيس مسعود بزشكيان|الرئيس مسعود بزشكيان|بزشكيان)/ui',
-        'التلفزيون الإيراني' => '/(التلفزيون الإيراني|الاذاعة و التلفزيون الإيراني|الإذاعة والتلفزيون الإيراني|وكالة إيرنا|إيرنا)/ui',
-        'وكالة فارس' => '/(وكالة فارس|فارس:|فارس\s*:)/ui',
-        'وكالة تسنيم' => '/(وكالة\s*[\"“”]?\s*تسنيم|تسنيم للأنباء|تسنيم:|تسنيم\s*:|نورنيوز)/ui',
-        'مقر خاتم الأنبياء الإيراني' => '/(مقر خاتم الأنبياء|خاتم الأنبياء المركزي|المتحدث باسم مقر خاتم الأنبياء)/ui',
-        'رئيس البرلمان الإيراني' => '/(رئيس البرلمان الإيراني|رئيس مجلس الشورى الإيراني|محمد باقر قاليباف|قاليباف)/ui',
-        'السفير الإيراني' => '/(السفير الإيراني|السفير الايراني|مير مسعود حسينيان|مسعود حسينيان)/ui',
-        'الوفد الإيراني' => '/(الوفد الإيراني|الوفد الايراني|المفاوضات الإيرانية الأميركية|المفاوضات الإيرانية الأمريكية|المفاوضين الإيرانيين|فريق المفاوضات الإيراني|فريق المفاوضات الايراني)/ui',
-        'إيران' => '/(مصادر إيرانية|مصدر إيراني|مسؤول عسكري إيراني|غريب آبادي|مرندي|آية الله مجتبى خامنئي|قائد الثورة|المرشد الأعلى لإيران|مجتبى خامنئي|عارف:|إعلام إيراني)/ui',
-        'الشرطة الإيرانية' => '/(الشرطة الإيرانية|الشرطة الايرانية)/ui',
-        'المجلس الإعلامي الحكومي الإيراني' => '/(أمين المجلس الإعلامي الحكومي الإيراني|المجلس الإعلامي الحكومي الإيراني)/ui',
-        'علي أكبر ولايتي' => '/(علي أكبر ولايتي|ولايتي:|مستشار المرشد الإيراني|مستشار قائد الثورة الإسلامية)/ui',
-        'الحكومة الإسرائيلية' => '/(نتنياهو|رئيس الوزراء الإسرائيلي|مكتب نتنياهو)/ui',
-        'وزارة الصحة الإسرائيلية' => '/(وزارة الصحة الإسرائيلية|وزارة الصحة الاسرائيلية)/ui',
-        'سفير إسرائيل' => '/(سفير إسرائيل|سفير اسرائيل)/ui',
-        'جيش العدو الإسرائيلي' => '/(المتحدث باسم الجيش الإسرائيلي|المتحدث باسم جيش العدو الإسرائيلي|الجيش الإسرائيلي ينذر|قوات اللواء|قوات الاحتلال)/ui',
-        'إعلام إسرائيلي' => '/(وسائل إعلام إسرائيلية|اعلام إسرائيلي|إعلام_العدو|إعلام العدو|القناة 12 العبرية|القناة 15|يديعوت أحرونوت|هآرتس|إذاعة جيش العدو الإسرائيلي)/ui',
-        'باكستان' => '/(شهباز شريف|رئيس الوزراء الباكستاني|الخارجية الباكستانية|رئيس وزراء باكستان|الجيش الباكستاني|القوات الجوية الباكستانية|مسؤول باكستاني رفيع|وزير الدفاع الباكستاني|خواجة آصف)/ui',
-        'دول البريكس' => '/(بريكس|BRICS|دول البريكس)/ui',
-        'دول الخليج' => '/(دول الخليج|مجلس التعاون الخليجي|الخليج العربي|الخليج)/ui',
-        'الدول العربية' => '/(الدول العربية|جامعة الدول العربية|الجامعة العربية)/ui',
-        'المؤتمر الشعبي اللبناني' => '/(المؤتمر الشعبي)/ui',
-        'إبراهيم الموسوي' => '/(إبراهيم الموسوي|النائب إبراهيم الموسوي)/ui',
-        'حسين الحاج حسن' => '/(حسين الحاج حسن|الحاج حسن للميادين|عضو كتلة الوفاء للمقاومة النائب د\.?حسين الحاج حسن)/ui',
-        'النائب فضل الله' => '/(النائب فضل الله|فضل الله:)/ui',
-        'النائب رعد' => '/(النائب رعد|رعد:)/ui',
-        'ماهر حمود' => '/(ماهر حمود|رئيس الاتحاد العالمي لعلماء المقاومة الشيخ ماهر حمود)/ui',
-        'شاكر البرجاوي' => '/(شاكر البرجاوي)/ui',
-        'عبد العزيز أبو طالب' => '/(عبد العزيز ابو طالب|عبد العزيز أبو طالب)/ui',
-        'نزيه منصور' => '/(نزيه منصور)/ui',
-        'كتائب القسام (حماس)' => '/(^|\s)(حماس|حركة حماس|كتائب القسام)(\s|:|$)/ui',
-        'المقاومة الإسلامية (حزب الله)' => '/(المقاومة الإسلامية|المقاومة الاسلامية|حزب الله|الشيخ قاسم|بيان صادر عن المقاومة الإسلامية|بيان صادر عن المقاومة الاسلامية|استهدفنا|استهدف مجاهدونا|مجاهدونا|قصفنا موقع|قصفنا)/ui',
-        'سرايا القدس (الجهاد الإسلامي)' => '/(^|\s)(سرايا القدس|الجهاد الإسلامي)(\s|:|$)/ui',
-        'الاتحاد الأوروبي' => '/(الاتحاد الأوروبي)/ui',
-        'الناتو' => '/(الناتو|حلف شمال الأطلسي|حلف شمال الاطلسي|NATO)/ui',
-        'رئيس الناتو' => '/(رئيس الناتو|الأمين العام للناتو|امين عام الناتو|الأمين العام لحلف شمال الأطلسي)/ui',
-        'الأمم المتحدة' => '/(الأمم المتحدة|اليونيسيف)/ui',
-        'الأمين العام للأمم المتحدة' => '/(الأمين العام للأمم المتحدة|امين عام الامم المتحدة|رئيس الأمم المتحدة|رئيس الامم المتحدة|غوتيريش|غوتيريس)/ui',
-        'البنك الدولي' => '/(رئيس البنك الدولي|البنك الدولي)/ui',
-        'الكويت' => '/(الدفاع الكويتية|الكويتية:|وزارة الدفاع الكويتية|الكويت)/ui',
-        'العراق' => '/(وسائل اعلام عراقية|إعلام عراقي|العراقية)/ui',
-        'فايننشال تايمز' => '/(فايننشال تايمز)/ui',
-        'بوليتيكو' => '/(بوليتيكو)/ui',
-        'الجيش الكويتي' => '/(الجيش الكويتي)/ui',
-        'حرس الثورة الإسلامية' => '/(حرس الثورة|وحدة المسيرات في حرس الثورة)/ui',
-    ];
+            // فحص الأسماء المستعارة (Aliases)
+            foreach ($data['aliases'] as $alias) {
+                if (mb_stripos($clean_text, $alias) !== false) {
+                    $score += 25;
+                    $matches[] = $alias;
+                    break; // نكتفي بأول مطابقة لتجنب تضخيم النقاط
+                }
+            }
 
-    foreach ($patterns as $label => $regex) {
-        if (preg_match($regex, $text)) return $label;
-    }
-    return '';
-}
+            // فحص الكلمات المفتاحية المرتبطة
+            foreach ($data['keywords'] as $keyword) {
+                if (mb_stripos($clean_text, $keyword) !== false) {
+                    $score += 10;
+                }
+            }
 
-function sod_infer_explicit_speaker_actor(string $text): string {
-    $text = so_clean_text($text);
-    if ($text === '') return '';
+            // تطبيق الأنماط النحوية (Regex) لتعزيز الدقة
+            foreach ($this->patterns_db as $pattern_name => $regex) {
+                if (preg_match($regex, $clean_text, $m)) {
+                    $matched_string = isset($m[1]) ? $m[1] : $m[0];
+                    // هل النمط يشير لهذا الفاعل؟
+                    if ($this->string_belongs_to_actor($matched_string, $actor_key)) {
+                        $score += 30; //Bonus للنمط النحوي الصحيح
+                        $matches[] = "pattern:{$pattern_name}";
+                    }
+                }
+            }
 
-    if (preg_match('/(^|[:：]\s*)(فانس|جي دي فانس|جاي دي فانس|نائب الرئيس الأميركي|نائب الرئيس الأمريكي)/ui', $text)) {
-        return 'البيت الأبيض';
-    }
-    if (preg_match('/(^|[:：]\s*)(ترامب|ترمب|دونالد ترامب|دونالد ترمب)/ui', $text)) {
-        return 'دونالد ترامب';
-    }
-    if (preg_match('/(^|[:：]\s*)(محمد مرندي|مرندي)\b/ui', $text)) {
-        return 'محمد مرندي';
-    }
-    if (preg_match('/(^|[:：]\s*)(قاآني|قآني|إسماعيل قاآني|إسماعيل قآني|قائد قوة القدس)/ui', $text)) {
-        return 'حرس الثورة الإسلامية';
-    }
-    if (preg_match('/(^|[:：]\s*)(بقائي)\b/ui', $text)) {
-        return 'الخارجية الإيرانية';
-    }
-    if (preg_match('/(^|[:：]\s*)(وكالة\s*[\"“”]?\s*تسنيم|تسنيم|وكالة فارس|فارس|التلفزيون الإيراني|إيرنا|إعلام إيراني)\s*[:：]/ui', $text)) {
-        return 'إيران';
-    }
-
-    return '';
-}
-
-function sod_governor_ai(array $result, string $text): array {
-    $text = so_clean_text($text);
-    $has_attack = preg_match('/(غارة|قصف|استهداف|هجوم|اشتباك|اقتحام|توغل|صاروخ|صواريخ|مسيّرة|مسيرة|دبابة|ثكنة|كمين|أغار|اعتداء إسرائيلي|إطلاق نار|استطلاع بطائرة مسيّرة|تم رصد)/ui', $text) === 1;
-    $is_non_military = sod_is_non_military_context($text);
-    $named_actor = sod_extract_named_nonmilitary_actor($text);
-
-    if ($is_non_military && !$has_attack) {
-        $result['primary_actor'] = $named_actor !== '' ? $named_actor : 'فاعل غير محسوم';
-        $result['secondary_actor'] = '';
-        $result['target'] = '';
-        $result['confidence'] = $named_actor !== '' ? max((int)($result['confidence'] ?? 0), 82) : min((int)($result['confidence'] ?? 35), 45);
-        $result['reason'] = $named_actor !== '' ? 'governor-named-nonmilitary' : 'governor-nonmilitary';
-        return $result;
-    }
-
-    if (preg_match('/(استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية|المقاومة الإسلامية في لبنان|المقاومة الاسلامية \(|ثكنة يعرا|مستوطنة أدميت|مستوطنة نهاريا)/ui', $text)) {
-        $result['primary_actor'] = 'المقاومة الإسلامية (حزب الله)';
-        $result['confidence'] = max((int)($result['confidence'] ?? 0), 90);
-        $result['reason'] = 'governor-force-resistance';
-    }
-
-    if (!$has_attack && (($result['primary_actor'] ?? '') === 'جيش العدو الإسرائيلي' || ($result['primary_actor'] ?? '') === 'المقاومة الإسلامية (حزب الله)')) {
-        $result['primary_actor'] = $named_actor !== '' ? $named_actor : 'فاعل غير محسوم';
-        $result['secondary_actor'] = '';
-        $result['target'] = '';
-        $result['confidence'] = $named_actor !== '' ? 84 : 40;
-        $result['reason'] = 'governor-remove-false-military';
-    }
-
-    return $result;
-}
-
-function sod_force_requested_actor_rule(string $actor, string $region, string $title = ''): string {
-    $actor = trim((string)$actor);
-    $region = trim((string)$region);
-    $title = so_clean_text((string)$title);
-    $named_actor = sod_extract_named_nonmilitary_actor($title);
-    $explicit_actor = sod_infer_explicit_speaker_actor($title);
-    $unknown_actor_values = ['', 'غير محدد', 'عام/مجهول', 'فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'];
-    $known_locked_actor_values = [
-        'الخارجية الإيرانية','البيت الأبيض','الولايات المتحدة','الحكومة الإيرانية','الرئاسة الإيرانية',
-        'مقر خاتم الأنبياء الإيراني','رئيس البرلمان الإيراني','السفير الإيراني','إيران',
-        'الشرطة الإيرانية','المجلس الإعلامي الحكومي الإيراني','علي أكبر ولايتي','الحكومة الإسرائيلية','وزارة الصحة الإسرائيلية',
-        'سفير إسرائيل','جيش العدو الإسرائيلي','إعلام إسرائيلي','باكستان','دول البريكس','دول الخليج','الدول العربية',
-        'المؤتمر الشعبي اللبناني','إبراهيم الموسوي','حسين الحاج حسن','النائب فضل الله','النائب رعد','ماهر حمود',
-        'شاكر البرجاوي','عبد العزيز أبو طالب','نزيه منصور','كتائب القسام (حماس)','المقاومة الإسلامية (حزب الله)',
-        'سرايا القدس (الجهاد الإسلامي)','الاتحاد الأوروبي','الناتو','رئيس الناتو','الأمم المتحدة','الأمين العام للأمم المتحدة',
-        'البنك الدولي','الكويت','العراق','فايننشال تايمز','بوليتيكو','منظومة الإنذار / الجبهة الداخلية','الوفد الإيراني'
-    ];
-
-    if ($explicit_actor !== '') return $explicit_actor;
-    if ($actor !== '' && !in_array($actor, ['غير محدد', 'عام/مجهول', 'فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'], true) && in_array($actor, $known_locked_actor_values, true)) {
-        return $actor;
-    }
-    if (in_array($named_actor, ['وكالة فارس', 'وكالة تسنيم', 'التلفزيون الإيراني'], true)) {
-        $named_actor = 'إيران';
-    }
-    if ($named_actor !== '' && (sod_is_non_military_context($title) || in_array($actor, $unknown_actor_values, true) || $actor === 'جيش العدو الإسرائيلي')) {
-        return $named_actor;
-    }
-    if ($actor !== '' && !in_array($actor, $unknown_actor_values, true) && $actor !== 'جيش العدو الإسرائيلي') {
-        return $actor;
-    }
-    if ($actor === 'منظومة الإنذار / الجبهة الداخلية') return $actor;
-    if (preg_match('/(لقد انتهى الحدث|انتهى الحدث|انذار احمر|إنذار أحمر|صفارات الإنذار|صافرات الإنذار|الجبهة الداخلية|تسوفار)/ui', $title)) return 'منظومة الإنذار / الجبهة الداخلية';
-    if (sod_is_non_military_context($title) || preg_match('/(صورة\s+لل?وفد|الوفد\s+الإيراني\s+المفاوض|إعلام\s+إيراني|رويترز\s+عن\s+مصدر|مصدر\s+دبلوماسي|المؤتمر الشعبي|النائب فضل الله|نتبلوكس|تغطية\s+خاصة)/ui', $title)) return $named_actor !== '' ? $named_actor : 'فاعل غير محسوم';
-    if (preg_match('/(الطيران الحربي المعادي|غارة إسرائيلية|غارات إسرائيلية|الجيش الإسرائيلي ينذر|شن غارات|أغار على بلدة|طائرات الاحتلال|الطيران الحربي المعادي أغار|سلسلة غارات إسرائيلية|غارتان لطيران العدو الإسرائيلي|مسيّرات معادية|مسيرات معادية)/ui', $title)) return 'جيش العدو الإسرائيلي';
-    if (($actor === 'جيش العدو الإسرائيلي' || $actor === 'فاعل غير محسوم' || $actor === 'فاعل سياقي غير مباشر' || $actor === 'فاعل سياقي') && $named_actor !== '') return $named_actor;
-    if (preg_match('/(المقاومة الإسلامية|حزب الله|استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية)/ui', $title)) return 'المقاومة الإسلامية (حزب الله)';
-    if (preg_match('/(الجيش الإسرائيلي|جيش الاحتلال|غارة إسرائيلية|قصف إسرائيلي|اعتداء إسرائيلي|طيران الاحتلال|الطيران الحربي المعادي|طائرات الاحتلال)/ui', $title)) return 'جيش العدو الإسرائيلي';
-    if (preg_match('/(إعلام|قناة|رويترز|العربية|الميادين|الجزيرة|صحيفة|تغطية|محلل|كاتب|اعلام باكستاني)/ui', $actor)) return $named_actor !== '' ? $named_actor : 'فاعل غير محسوم';
-    if (in_array($actor, ['', 'غير محدد', 'عام/مجهول', 'فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'], true)) {
-        if ($named_actor !== '') return $named_actor;
-        if (preg_match('/(إيران|ايران|طهران)/ui', $title)) return 'إيران';
-        if (preg_match('/(الولايات المتحدة|أمريكا|امريكا|واشنطن|البيت الأبيض|ترامب|ترمب)/ui', $title)) return 'الولايات المتحدة';
-        if (preg_match('/(باكستان|إسلام آباد|اسلام آباد)/ui', $title)) return 'باكستان';
-        return 'فاعل غير محسوم';
-    }
-    return $actor;
-}
-
-function sod_strip_leading_source_attribution(string $text): string {
-    $text = so_clean_text($text);
-    if ($text === '') return '';
-
-    $patterns = [
-        '/^\s*(?:فلسطين المحتلة|لبنان|إيران|العراق|سوريا)\s*:\s*مراسل\s+(?:المنار|الميادين|العربية)\s*(?:في\s+[^\:]{1,40})?\s*:\s*/ui',
-        '/^\s*مراسل\s+(?:المنار|الميادين|العربية)\s*(?:في\s+[^\:]{1,40})?\s*:\s*/ui',
-        '/^\s*(?:أ\s*ف\s*ب|رويترز|وكالة\s+فارس|وكالة\s+تسنيم|التلفزيون\s+الإيراني|وسائل\s+إعلام\s+إسرائيلية|إعلام\s+العدو|القناة\s*1[25]|المنار|الميادين|العربية)\s*:\s*/ui',
-    ];
-
-    foreach ($patterns as $pattern) {
-        $text = preg_replace($pattern, '', $text);
-    }
-
-    return trim($text);
-}
-
-function sod_infer_actor_fallback(string $title, string $region = '', string $source_name = ''): string {
-    $title_text = sod_strip_leading_source_attribution($title);
-    $text = so_clean_text($title_text !== '' ? $title_text : $title);
-    $source_text = so_clean_text((string)$source_name);
-    $region = trim((string)$region);
-    if ($text === '') return '';
-
-    $explicit_actor = sod_infer_explicit_speaker_actor($text);
-    if ($explicit_actor !== '') return $explicit_actor;
-
-    $named_actor = sod_extract_named_nonmilitary_actor($text);
-    if ($named_actor !== '') return $named_actor;
-
-    $is_kinetic = preg_match('/(غارة|غارات|قصف|استهداف|اقتحام|عدوان|اعتداء|هدم عقابي|إطلاق نار|توغل|هجوم|طيران حربي|قصف مدفعي|مسيّرة|مسيرة|اشتباكات|نيران مشاة|استطلاع بطائرة مسيّرة)/ui', $text) === 1;
-    $enemy_markers = preg_match('/(العدو الإسرائيلي|العدو الاسرائيلي|إسرائيلي|اسرائيلي|الاحتلال|جيش الاحتلال|جيش العدو|طيران الاحتلال|طيران حربي معاد|قوات الاحتلال)/ui', $text) === 1;
-    $palestine_theater = preg_match('/(فلسطين|غزة|الضفة الغربية|جنين|نابلس|الخليل|بيت لحم|خانيونس|خان يونس|رفح|طوباس|طولكرم|قلنديا)/ui', $text) === 1;
-    $lebanon_theater = preg_match('/(لبنان|جنوب لبنان|البقاع|صور|النبطية|بنت جبيل|قانا|السماعية|عيتيت|الخيام|شبعا|كونين|خربة سلم|حانين|حلتا)/ui', $text) === 1;
-
-    if ($is_kinetic && ($enemy_markers || $palestine_theater || $lebanon_theater || in_array($region, ['لبنان', 'فلسطين', 'الأراضي المحتلة (إسرائيل)'], true))) {
-        if (preg_match('/(المقاومة الإسلامية|حزب الله|استهدفنا|استهدف مجاهدونا|بيان صادر عن المقاومة الإسلامية)/ui', $text)) {
-            return 'المقاومة الإسلامية (حزب الله)';
+            if ($score > 0) {
+                $scores[$actor_key] = [
+                    'score' => $score,
+                    'name' => $data['official'],
+                    'matches' => $matches
+                ];
+            }
         }
-        return 'جيش العدو الإسرائيلي';
+
+        // اختيار الأعلى نقاطاً
+        if (empty($scores)) {
+            return ['actor' => 'غير محدد', 'confidence' => 0, 'details' => []];
+        }
+
+        usort($scores, function($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        $winner = reset($scores);
+        
+        // تطبيع النتيجة إلى نسبة مئوية (سقف 100)
+        $confidence = min(100, ($winner['score'] / 100) * 100); 
+        
+        // تعديل بسيط: إذا كانت النتيجة أقل من 20، نعتبرها غير مؤكدة
+        if ($winner['score'] < 20) {
+            $confidence = 0;
+            $winner['name'] = 'غير محدد';
+        }
+
+        return [
+            'actor' => $winner['name'],
+            'confidence' => $confidence,
+            'details' => $winner['matches']
+        ];
     }
 
-    if (preg_match('/(بقائي|عراقجي|طهران|إيران|ايران|الوفد الإيراني|المحادثات الإيرانية الأمريكية|المفاوضات الإيرانية الأمريكية)/ui', $text)) {
-        return 'إيران';
-    }
-    if (preg_match('/(الخارجية الإيرانية|وزارة الخارجية الإيرانية)/ui', $text)) {
-        return 'الخارجية الإيرانية';
-    }
-    if (preg_match('/(الحكومة الإيرانية)/ui', $text)) {
-        return 'الحكومة الإيرانية';
-    }
-    if (preg_match('/(قاآني|قآني|إسماعيل قاآني|إسماعيل قآني|قائد قوة القدس|قوة القدس|حرس الثورة|الحرس الثوري|القوة الجوفضائية لحرس الثورة)/ui', $text)) {
-        return 'حرس الثورة الإسلامية';
-    }
-    if (preg_match('/(ترامب|ترمب|دونالد ترامب|دونالد ترمب)/ui', $text)) {
-        return 'دونالد ترامب';
-    }
-    if (preg_match('/(فانس|جي دي فانس|جاي دي فانس|JD Vance)/ui', $text)) {
-        return 'البيت الأبيض';
-    }
-    if (preg_match('/(البيت الأبيض|مسؤول بالبيت الأبيض|مسؤول في البيت الأبيض)/ui', $text)) {
-        return 'البيت الأبيض';
-    }
-    if (preg_match('/(محمد مرندي|مرندي)/ui', $text)) {
-        return 'محمد مرندي';
-    }
-    if (preg_match('/(شارل جبور)/ui', $text)) {
-        return 'شارل جبور';
-    }
-    if (preg_match('/(نتنياهو|الحكومة الإسرائيلية|الحكومة الاسرائيلية)/ui', $text)) {
-        return 'الحكومة الإسرائيلية';
-    }
-    if (preg_match('/(باكستان|إسلام آباد|اسلام آباد|الوسيط الباكستاني|وفد باكستاني)/ui', $text)) {
-        return 'باكستان';
-    }
-    if (preg_match('/(الولايات المتحدة|أمريكا|امريكا|واشنطن)/ui', $text)) {
-        return 'الولايات المتحدة';
+    /**
+     * مساعدة: هل السلسلة النصية تنتمي لهذا الفاعل؟
+     */
+    private function string_belongs_to_actor($string, $actor_key) {
+        $data = $this->actors_db[$actor_key];
+        $check = mb_strtolower(trim($string));
+        
+        // فحص مباشر
+        if (mb_strpos($check, mb_strtolower($data['official'])) !== false) return true;
+        
+        foreach ($data['aliases'] as $alias) {
+            if (mb_strpos($check, mb_strtolower($alias)) !== false) return true;
+        }
+        
+        return false;
     }
 
-    if (preg_match('/(وسائل إعلام إسرائيلية|إعلام إسرائيلي|إعلام العدو|الاعلام العبري|القناة\s*1[25]|القناة 12|القناة 15|يديعوت|هآرتس)/ui', $text)) {
-        return 'إعلام إسرائيلي';
-    }
-    if (preg_match('/(التلفزيون الإيراني|إيرنا|وكالة فارس|وكالة تسنيم|إعلام إيراني)/ui', $text)) {
-        return 'إيران';
-    }
-    if ($is_kinetic) {
-        return '';
+    /**
+     * مساعدة: هل الفاعل عام جداً؟
+     */
+    private function is_generic_actor($actor) {
+        $generics = ['غير محدد', 'طرف مجهول', 'مصدر أمني', 'جهات مجهولة', 'عدو', 'مقاومة'];
+        return in_array($actor, $generics);
     }
 
-    if (preg_match('/(قناة العربية|العربية_|العربية)/ui', $source_text)) {
-        return 'قناة العربية';
-    }
-    if (preg_match('/(الميادين|مراسل الميادين)/ui', $source_text)) {
-        return 'الميادين';
-    }
-    if (preg_match('/(المنار|مراسل المنار)/ui', $source_text)) {
-        return 'المنار';
+    /**
+     * مساعدة: هل الفاعل محدد ودقيق؟
+     */
+    private function is_specific_actor($actor) {
+        foreach ($this->actors_db as $data) {
+            if ($actor === $data['official']) return true;
+        }
+        return false;
     }
 
-    return '';
+    /**
+     * تنظيف وتوحيد النص العربي
+     */
+    private function normalize_text($text) {
+        $text = strip_tags($text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        // توحيد الألف والهمزات لتحسين البحث
+        $text = str_replace(['أ', 'إ', 'آ'], 'ا', $text);
+        $text = str_replace(['ى'], 'ي', $text);
+        $text = str_replace(['ة'], 'ه', $text);
+        return trim($text);
+    }
+
+    /**
+     * تحديث البنوك الإحصائية
+     */
+    private function update_stats_banks($post_id, $data) {
+        // يمكن هنا إضافة منطق لتحديث جداول الإحصائيات العامة
+        do_action('sod_stats_update', $post_id, $data);
+    }
 }
