@@ -6231,6 +6231,37 @@ function sod_render_powerbi(array $atts = []): string {
                         </div>
                     </div>
                 </div>
+                
+                <!-- قسم التنبؤات والتهديدات -->
+                <div class="sod-card">
+                    <div class="sod-card-header">🔮 محرك التنبؤ بالتهديدات</div>
+                    <div class="sod-card-body">
+                        <div id="<?php echo esc_attr($uid); ?>-prediction-content">
+                            <div class="sod-loading-row">⏳ جارٍ تحليل السيناريوهات...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- خريطة التهديدات التفاعلية -->
+                <div class="sod-card">
+                    <div class="sod-card-header">🗺️ خريطة التهديدات الساخنة</div>
+                    <div class="sod-card-body">
+                        <div id="<?php echo esc_attr($uid); ?>-threat-map" style="height:400px;border-radius:8px;overflow:hidden;">
+                            <div class="sod-loading-row">⏳ جارٍ تحميل الخريطة...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- مؤشر الذكاء الاصطناعي -->
+                <div class="sod-card">
+                    <div class="sod-card-header">🧠 مؤشر الذكاء الاصطناعي التحليلي</div>
+                    <div class="sod-card-body">
+                        <div id="<?php echo esc_attr($uid); ?>-ai-brain-content">
+                            <div class="sod-loading-row">⏳ جارٍ تحليل الأنماط...</div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="sod-card">
                     <div class="sod-card-header">🧠 الموجز التحليلي المعمّق</div>
                     <div class="sod-brief-container" id="<?php echo esc_attr($uid); ?>-report-brief"><div class="sod-brief-loading">⏳ جارٍ إعداد التحليل...</div></div>
@@ -6781,12 +6812,204 @@ function renderReports(analytics,events){
         <div class="sod-setting-item"><div class="sod-setting-label">إجمالي الأحداث</div><div class="sod-setting-value">${ar(total)}</div></div>
         <div class="sod-setting-item"><div class="sod-setting-label">أحداث حرجة</div><div class="sod-setting-value" style="color:#f87171;">${ar(analytics.critical||0)}</div></div>
     </div>`;
+    
+    // تحديث قسم التنبؤات
+    renderPredictionSection(analytics, events);
+    
+    // تحديث خريطة التهديدات
+    renderThreatMap(analytics, events);
+    
+    // تحديث مؤشر الذكاء الاصطناعي
+    renderAIBrainSection(analytics, events);
+    
     const brief=$id('report-brief');
     if(brief){brief.innerHTML=`<div style="font-size:12px;color:#94a3b8;line-height:1.8;">
         <p>يشهد المشهد الاستخباراتي في الفترة المرصودة <strong style="color:#e2e8f0;">${ar(total)} حدثاً</strong>، منها <strong style="color:#f87171;">${ar(analytics.critical||0)} حدثاً حرجاً</strong>.</p>
         <p>اتجاه الصراع: <strong style="color:#f97316;">${esc(warDir)}</strong> مع مؤشر تصعيد بلغ <strong style="color:#c084fc;">${ar(esc_idx)}%</strong>.</p>
         <p>نسبة الأحداث الميدانية من إجمالي الأحداث: <strong style="color:#f87171;">${ar(field_pct)}%</strong>.</p>
     </div>`;}
+}
+
+/* ── Prediction Section — محرك التنبؤ بالتهديدات ── */
+function renderPredictionSection(analytics, events){
+    const el=$id('prediction-content');if(!el)return;
+    if(!events || !events.length){
+        el.innerHTML='<div class="sod-loading-row">لا توجد بيانات كافية للتنبؤ</div>';
+        return;
+    }
+    // استخراج آخر الأحداث الحرجة للتنبؤ
+    const criticalEvents = events.filter(e => (e.score||0) >= 140).slice(0, 5);
+    const topEvent = criticalEvents[0] || events[0];
+    
+    // حساب مؤشرات التنبؤ
+    const escalationTrend = analytics.escalation_index || 0;
+    const riskScore = Math.min(100, Math.round(escalationTrend * 1.2 + (analytics.critical||0) * 2));
+    const confidence = Math.max(20, Math.min(85, 60 + (criticalEvents.length > 0 ? 15 : 0) - (escalationTrend > 50 ? 10 : 0)));
+    
+    // توليد السيناريوهات
+    const scenarios = [
+        { name: 'استمرار النمط الحالي', prob: Math.max(18, Math.min(72, confidence)), desc: 'ترجيح استمرار الأحداث وفق النمط الحالي' },
+        { name: 'تصعيد إقليمي محدود', prob: Math.max(10, Math.min(65, Math.round(riskScore * 0.7))), desc: 'احتمال تصاعد قريب إذا تكررت المؤشرات' },
+        { name: 'احتواء/تبريد', prob: Math.max(8, 100 - confidence - Math.round(riskScore * 0.7) - 10), desc: 'احتمال التراجع إذا لم تظهر مؤشرات إضافية' },
+        { name: 'حدث مفاجئ', prob: 10.0, desc: 'احتمال التحول المفاجئ قائم لكنه غير مدعوم بمؤشرات' }
+    ];
+    scenarios.sort((a,b) => b.prob - a.prob);
+    
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+        <div class="sod-kpi-card" style="border-color:${riskScore>=70?'#ef4444':riskScore>=40?'#f97316':'#22c55e'};">
+            <div class="sod-kpi-icon">⚠️</div>
+            <div><div class="sod-kpi-label">مؤشر الخطورة</div><div class="sod-kpi-value" style="color:${sodGetScoreColor(riskScore*3)};">${ar(riskScore)}%</div></div>
+        </div>
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">🎯</div>
+            <div><div class="sod-kpi-label">الثقة بالتنبؤ</div><div class="sod-kpi-value" style="color:#22c55e;">${ar(confidence)}%</div></div>
+        </div>
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">📊</div>
+            <div><div class="sod-kpi-label">أحداث محللة</div><div class="sod-kpi-value">${ar(events.length)}</div></div>
+        </div>
+    </div>`;
+    
+    html += '<div style="margin-top:12px;"><div style="font-size:13px;color:#e2e8f0;font-weight:700;margin-bottom:8px;">السيناريوهات المتوقعة:</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    scenarios.forEach((s, idx) => {
+        const barColor = s.prob >= 50 ? '#ef4444' : s.prob >= 30 ? '#f97316' : '#22c55e';
+        html += `<div style="background:#0f172a;border-radius:6px;padding:10px;border:1px solid #1e293b;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-size:12px;color:#e2e8f0;font-weight:600;">${idx+1}. ${esc(s.name)}</span>
+                <span style="font-size:11px;color:${barColor};font-weight:700;">${ar(s.prob.toFixed(1))}%</span>
+            </div>
+            <div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;">
+                <div style="width:${s.prob}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.5s;"></div>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:6px;">${esc(s.desc)}</div>
+        </div>`;
+    });
+    html += '</div></div>';
+    
+    if(topEvent && topEvent.title){
+        html += `<div style="margin-top:16px;padding:12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;">
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">آخر حدث مؤثر:</div>
+            <div style="font-size:12px;color:#e2e8f0;font-weight:600;">${esc(topEvent.title)}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">${esc(topEvent.region||'')} • خطورة: ${ar(topEvent.score||0)}</div>
+        </div>`;
+    }
+    
+    el.innerHTML = html;
+}
+
+/* ── Threat Map Section — خريطة التهديدات الساخنة ── */
+function renderThreatMap(analytics, events){
+    const el=$id('threat-map');if(!el)return;
+    
+    // تجميع الأحداث حسب المنطقة
+    const regionCounts = {};
+    const regionScores = {};
+    (events||[]).forEach(e => {
+        const r = e.region || 'غير محدد';
+        regionCounts[r] = (regionCounts[r]||0) + 1;
+        regionScores[r] = (regionScores[r]||0) + (e.score||0);
+    });
+    
+    const regions = Object.keys(regionCounts).sort((a,b) => regionScores[b] - regionScores[a]).slice(0, 8);
+    
+    let html = '<div style="height:100%;display:flex;flex-direction:column;">';
+    html += '<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:14px;color:#64748b;">';
+    html += '<div style="text-align:center;padding:20px;">';
+    html += '<div style="font-size:32px;margin-bottom:12px;">🗺️</div>';
+    html += '<div style="font-weight:700;color:#94a3b8;margin-bottom:8px;">خريطة التهديدات التفاعلية</div>';
+    html += '<div style="font-size:12px;color:#64748b;">اضغط على زر "الخرائط" في القائمة الجانبية لعرض الخريطة الكاملة</div>';
+    html += '</div></div>';
+    
+    // قائمة المناطق الساخنة
+    html += '<div style="padding:12px;border-top:1px solid #1e293b;">';
+    html += '<div style="font-size:12px;color:#94a3b8;margin-bottom:8px;font-weight:600;">المناطق الأكثر توتراً:</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    regions.forEach(r => {
+        const scoreAvg = regionScores[r] / regionCounts[r];
+        const color = sodGetScoreColor(scoreAvg);
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#0f172a;border-radius:4px;">
+            <span style="font-size:11px;color:#e2e8f0;">${esc(r)}</span>
+            <span style="font-size:10px;color:${color};font-weight:700;">${ar(regionCounts[r])} حدث • متوسط: ${ar(Math.round(scoreAvg))}</span>
+        </div>`;
+    });
+    html += '</div></div></div>';
+    
+    el.innerHTML = html;
+}
+
+/* ── AI Brain Section — مؤشر الذكاء الاصطناعي ── */
+function renderAIBrainSection(analytics, events){
+    const el=$id('ai-brain-content');if(!el)return;
+    
+    const total = analytics.total || 0;
+    const critical = analytics.critical || 0;
+    const actors = analytics.actors || {};
+    const intelTypes = analytics.intel_types || {};
+    const patterns = analytics.hourly || [];
+    
+    // حساب مؤشرات الذكاء الاصطناعي
+    const actorCount = Object.keys(actors).length;
+    const typeCount = Object.keys(intelTypes).length;
+    const patternStrength = patterns.length > 0 ? Math.min(100, Math.round((patterns.filter(p => p.count > 2).length / patterns.length) * 100)) : 0;
+    const learningScore = Math.min(100, Math.round((total > 0 ? 30 : 0) + (actorCount > 3 ? 20 : 0) + (typeCount > 4 ? 20 : 0) + (patternStrength > 50 ? 30 : 0)));
+    
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">🧠</div>
+            <div><div class="sod-kpi-label">درجة التعلم</div><div class="sod-kpi-value" style="color:${sodGetScoreColor(learningScore*3)};">${ar(learningScore)}%</div></div>
+        </div>
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">🎭</div>
+            <div><div class="sod-kpi-label">فاعلون مكتشفون</div><div class="sod-kpi-value">${ar(actorCount)}</div></div>
+        </div>
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">📑</div>
+            <div><div class="sod-kpi-label">أنماط مصنفّة</div><div class="sod-kpi-value">${ar(typeCount)}</div></div>
+        </div>
+        <div class="sod-kpi-card">
+            <div class="sod-kpi-icon">📈</div>
+            <div><div class="sod-kpi-label">قوة الأنماط</div><div class="sod-kpi-value" style="color:${patternStrength>=60?'#22c55e':patternStrength>=30?'#f97316':'#ef4444'};">${ar(patternStrength)}%</div></div>
+        </div>
+    </div>`;
+    
+    // أهم الفاعلين
+    if(actorCount > 0){
+        const topActors = Object.entries(actors).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        html += '<div style="margin-top:12px;"><div style="font-size:13px;color:#e2e8f0;font-weight:700;margin-bottom:8px;">أهم الفاعلين المكتشفين:</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        topActors.forEach(([actor, count]) => {
+            html += `<span class="sod-badge" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;">${esc(actor)} (${ar(count)})</span>`;
+        });
+        html += '</div></div>';
+    }
+    
+    // توزيع أنواع الاستخبارات
+    if(typeCount > 0){
+        const topTypes = Object.entries(intelTypes).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        html += '<div style="margin-top:12px;"><div style="font-size:13px;color:#e2e8f0;font-weight:700;margin-bottom:8px;">توزيع أنواع المعلومات:</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        topTypes.forEach(([type, count]) => {
+            const pct = Math.round((count / total) * 100);
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#94a3b8;">${esc(type)}</span>
+                <span style="color:#e2e8f0;font-weight:600;">${ar(count)} (${ar(pct)}%)</span>
+            </div>`;
+        });
+        html += '</div></div>';
+    }
+    
+    el.innerHTML = html;
+}
+
+/* ── Helper: Score Color ── */
+function sodGetScoreColor(score){
+    if(score>=300)return '#ef4444';
+    if(score>=200)return '#f97316';
+    if(score>=140)return '#f59e0b';
+    if(score>=80)return '#eab308';
+    if(score>=40)return '#22c55e';
+    return '#64748b';
 }
 
 /* ── Video page — Live Streams + Media ── */
