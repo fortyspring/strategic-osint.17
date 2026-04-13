@@ -4065,52 +4065,22 @@ class SO_Alert_Dispatcher {
 
         $wd = json_decode((string)($item['war_data'] ?? '{}'), true) ?: [];
         $title  = wp_strip_all_tags((string)($item['title'] ?? ''));
-        $score  = (int)($item['score'] ?? 0);
         $region = sanitize_text_field((string)($item['region'] ?? 'غير محدد'));
-        $intel  = sanitize_text_field((string)($item['intel_type'] ?? 'عام'));
-        $level  = sanitize_text_field((string)($item['tactical_level'] ?? 'عملياتي'));
-        $actor  = sanitize_text_field((string)($item['actor_v2'] ?? 'فاعل غير محسوم'));
+        $category = sanitize_text_field((string)($item['intel_type'] ?? 'عام'));
         $source = sanitize_text_field((string)($item['source_name'] ?? 'غير محدد'));
-        $target = sanitize_text_field((string)($wd['target'] ?? ($item['target_v2'] ?? '')));
-        $intent = sanitize_text_field((string)($wd['intent'] ?? ($item['intent'] ?? '')));
-        $context = sanitize_text_field((string)($wd['context_actor'] ?? ($item['context_actor'] ?? '')));
-        $weapon = sanitize_text_field((string)($wd['weapon_means'] ?? ($item['weapon_v2'] ?? '')));
-        $link = so_normalize_event_link((string)($item['link'] ?? ''));
-        $image_url = trim((string)($item['image_url'] ?? ''));
-        $timestamp = !empty($item['event_timestamp']) ? gmdate('c', (int)$item['event_timestamp']) : gmdate('c');
 
-        $fields = [
-            ['name' => 'المصدر', 'value' => $source !== '' ? $source : 'غير محدد', 'inline' => true],
-            ['name' => 'التصنيف', 'value' => $intel !== '' ? $intel : 'غير محدد', 'inline' => true],
-            ['name' => 'المستوى', 'value' => $level !== '' ? $level : 'غير محدد', 'inline' => true],
-            ['name' => 'الفاعل', 'value' => $actor !== '' ? $actor : 'فاعل غير محسوم', 'inline' => true],
-            ['name' => 'المنطقة', 'value' => $region !== '' ? $region : 'غير محدد', 'inline' => true],
-            ['name' => 'الخطورة', 'value' => (string)$score, 'inline' => true],
-        ];
-        if ($target !== '')  $fields[] = ['name' => 'الهدف', 'value' => $target, 'inline' => true];
-        if ($intent !== '')  $fields[] = ['name' => 'النية', 'value' => $intent, 'inline' => true];
-        if ($context !== '') $fields[] = ['name' => 'السياق', 'value' => $context, 'inline' => true];
-        if ($weapon !== '')  $fields[] = ['name' => 'الوسيلة', 'value' => $weapon, 'inline' => true];
-
-        $embed = [
-            'title' => sod_safe_substr($title !== '' ? $title : 'Beiruttime OSINT Alert', 0, 250),
-            'url' => $link,
-            'description' => "تنبيه استخباراتي من Beiruttime OSINT",
-            'color' => self::discord_color_for_score($score),
-            'fields' => $fields,
-            'footer' => ['text' => 'Beiruttime OSINT'],
-            'timestamp' => $timestamp,
-        ];
-
-        if ($image_url !== '' && preg_match('/\.(jpg|jpeg|png|gif|webp)(\?|$)/i', $image_url)) {
-            $embed['image'] = ['url' => esc_url_raw($image_url)];
-        } elseif ($image_url !== '') {
-            $embed['description'] .= "\nرابط الوسائط: " . esc_url_raw($image_url);
-        }
+        $message_content = "**🚨 تنبيه | Beiruttime OSINT**\n\n";
+        $message_content .= "**التنبيه :**\n{$title}\n\n";
+        $message_content .= "📰 **المصدر:** {$source}\n";
+        $message_content .= "📌 **التصنيف:** {$category}\n";
+        $message_content .= "📍 **المنطقة:** {$region}\n\n";
+        $message_content .= "————————————————————\n";
+        $message_content .= "تابعونا على قنواتنا :\n";
+        $message_content .= "قناة واتس اب :\n https://whatsapp.com/channel/0029VbBIXFZJ3juwB4Pm5n2w   |  📢 قناة تلغرام :\n";
+        $message_content .= "https://t.me/osint_lb";
 
         $payload = [
-            'content' => '🚨 Beiruttime OSINT Alert',
-            'embeds' => [$embed],
+            'content' => $message_content,
             'allowed_mentions' => ['parse' => []],
         ];
 

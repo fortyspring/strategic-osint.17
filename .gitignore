@@ -1,12 +1,7 @@
 ```
-# Dependencies
-node_modules/
-vendor/
-
-# Build artifacts
-dist/
-build/
-target/
+# Compiled and build artifacts
+*.pyc
+__pycache__/
 *.o
 *.obj
 *.exe
@@ -15,65 +10,40 @@ target/
 *.a
 *.out
 
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+# Dependencies
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+venv/
+node_modules/
+dist/
+build/
+target/
+.gradle/
+
+# Logs and temp files
 *.log
 *.tmp
 *.swp
-.DS_Store
-Thumbs.db
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
 *.swo
-*.tmp
 
-# Environment variables
+# Environment
 .env
 .env.local
 *.env.*
 
-# Testing
-.coverage
-htmlcov/
-.nyc_output
-coverage/
-*.log
-
-# Distribution / packaging
-.Python
-env/
-venv/
-ENV/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+# Editors
+.vscode/
+.idea/
 
 # System files
 .DS_Store
 Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Cache directories
+.mypy_cache/
+.pytest_cache/
 ```
