@@ -20,6 +20,12 @@ if (is_dir($sod_inc_base)) {
     require_once $sod_inc_base . '/newslog-service.php';
 }
 
+// تحميل ملفات الحرب المركبة والتكامل
+require_once __DIR__ . '/osint-hybrid-warfare-update.php';
+require_once $sod_inc_base . '/class-hybrid-warfare-integrator.php';
+require_once $sod_inc_base . '/class-entity-relations-manager.php';
+
+
 function sod_has_arabic_chars(string $text): bool {
     return $text !== '' && preg_match('/\p{Arabic}/u', $text) === 1;
 }
@@ -6460,6 +6466,10 @@ add_action('init', 'sod_register_dashboard_rewrite_rule');
 register_activation_hook(__FILE__, function () {
     sod_register_dashboard_rewrite_rule();
     flush_rewrite_rules();
+    // تفعيل تحديثات الحرب المركبة
+    if (function_exists('sod_activate_hybrid_warfare_update')) {
+        sod_activate_hybrid_warfare_update();
+    }
 });
 
 register_deactivation_hook(__FILE__, function () {
