@@ -1,0 +1,41 @@
+{
+    "name": "beiruttime/osint-pro",
+    "description": "Strategic OSINT Dashboard for WordPress with modular architecture",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "BeirutTime",
+            "email": "info@beiruttime.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4",
+        "composer/installers": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0",
+        "yoast/phpunit-polyfills": "^1.0",
+        "wp-coding-standards/wpcs": "^2.3",
+        "phpcompatibility/phpcompatibility-wp": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "OSINT\\": "includes/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:cache": "phpunit --group cache",
+        "test:websocket": "phpunit --group websocket",
+        "test:module": "phpunit --group module",
+        "lint": "phpcs --standard=WordPress",
+        "lint:fix": "phpcbf --standard=WordPress"
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
