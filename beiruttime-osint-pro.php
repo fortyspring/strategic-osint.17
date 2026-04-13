@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: Beiruttime OSINT Pro — نظام الرصد الاستخباراتي الموحد V17
+ * Plugin Name: Beiruttime OSINT System — V.Beta 111
  * Plugin URI: https://t.me/osint_lb
- * Description: V17.3 — الجيل الاحترافي الكامل مع قواميس موسعة: مركز قيادة استخباراتي [sod_command_deck]، بنوك المعلومات (أشخاص/أماكن/أسلحة/عمليات)، خوارزميات تصنيف متقدمة، رادار التهديد SVG، مخطط النشاط الساعي، رسم الكيانات والعلاقات، تتبع الساحات الساخنة، دعم كامل V11+V12+V16 في ملف واحد + 40+ فاعل عالمي + 30+ سلاح متطور.
- * Version: 17.4.2 AutoTrain AutoEval Fixed
- * Author: Mohammad Qassem / Beirut Time
+ * Description: نظام الرصد الاستخباراتي الموحد - الجيل الاحترافي الكامل مع قواميس موسعة: مركز قيادة استخباراتي [sod_command_deck]، بنوك المعلومات (أشخاص/أماكن/أسلحة/عمليات)، خوارزميات تصنيف متقدمة، رادار التهديد SVG، مخطط النشاط الساعي، رسم الكيانات والعلاقات، تتبع الساحات الساخنة، دعم كامل V11+V12+V16 في ملف واحد + 40+ فاعل عالمي + 30+ سلاح متطور.
+ * Version: V.Beta 111
+ * Author: M.Kassem and qwen.ai
  * Author URI: https://t.me/osint_lb
  * Text Domain: beiruttime-osint-pro
  * Domain Path: /languages
@@ -7001,7 +7001,7 @@ function sod_get_shared_styles(): string {
         .sod-tg-widget{min-height:380px !important;}
     }
 	/* ==========================================================
-   تحسينات الهواتف لـ Beiruttime OSINT Pro V17
+   تحسينات الهواتف لـ Beiruttime OSINT System V.Beta 111
    لا تؤثر على الخدمات أو الوظائف
    ========================================================== */
 
@@ -8961,7 +8961,7 @@ class SO_Admin_UI {
     }
 
     public static function register_menus() {
-        add_menu_page('Beiruttime OSINT Pro', 'OSINT Pro V17', 'manage_options', 'strategic-osint', [__CLASS__,'page_main'], 'dashicons-radar', 3);
+        add_menu_page('Beiruttime OSINT System', 'OSINT System V.Beta 111', 'manage_options', 'strategic-osint', [__CLASS__,'page_main'], 'dashicons-radar', 3);
         add_submenu_page('strategic-osint', 'الإعدادات العامة', 'الإعدادات العامة', 'manage_options', 'strategic-osint', [__CLASS__,'page_main']);
         add_submenu_page('strategic-osint', 'المصادر', 'المصادر (RSS/TG/X)', 'manage_options', 'strategic-osint-sources', [__CLASS__,'page_sources']);
         add_submenu_page('strategic-osint', 'الذكاء الاصطناعي', 'الذكاء الاصطناعي LLM', 'manage_options', 'strategic-osint-llm', [__CLASS__,'page_llm']);
@@ -9040,7 +9040,62 @@ class SO_Admin_UI {
                     }
                 }
                 echo "<p style='color:green'><strong>تمت معالجة {$processed} حدث بنجاح.</strong> (أخطاء: {$errors})</p>";
-                echo '<a href="' . esc_url(admin_url('admin.php?page=strategic-osint-reindex')) . '" class="button button-primary">متابعة المعالجة</a>';
+                
+                // التحقق مما إذا كانت هناك أحداث متبقية
+                $remaining = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE threat_score = 0 OR threat_score IS NULL");
+                
+                if ($remaining > 0) {
+                    echo '<div id="bt-auto-continue" style="margin-top:15px; padding:15px; background:#e8f5e9; border-radius:8px; border:1px solid #4caf50;">';
+                    echo '<p style="margin:0 0 10px; color:#2e7d32;"><strong>متبقي ' . number_format($remaining) . ' حدث للمعالجة.</strong></p>';
+                    echo '<button type="button" id="bt-continue-auto" class="button button-primary" onclick="btContinueAuto()">⏩ متابعة تلقائية للمعالجة</button>';
+                    echo '<button type="button" id="bt-stop-auto" class="button" onclick="btStopAuto()" style="display:none; margin-left:10px;">⏹ إيقاف</button>';
+                    echo '<span id="bt-timer" style="margin-left:15px; color:#666;">سيبدأ العد التنازلي خلال <span id="bt-countdown">5</span> ثوانٍ...</span>';
+                    echo '</div>';
+                    
+                    echo '<script>
+                    var btAutoContinue = true;
+                    var btTimer = null;
+                    var btCountdown = 5;
+                    
+                    function btContinueAuto() {
+                        btAutoContinue = true;
+                        document.getElementById("bt-continue-auto").style.display = "none";
+                        document.getElementById("bt-stop-auto").style.display = "inline-block";
+                        startCountdown();
+                    }
+                    
+                    function btStopAuto() {
+                        btAutoContinue = false;
+                        clearTimeout(btTimer);
+                        document.getElementById("bt-continue-auto").style.display = "inline-block";
+                        document.getElementById("bt-stop-auto").style.display = "none";
+                        document.getElementById("bt-timer").innerHTML = "تم إيقاف المعالجة التلقائية.";
+                    }
+                    
+                    function startCountdown() {
+                        btCountdown = 5;
+                        document.getElementById("bt-countdown").textContent = btCountdown;
+                        btTimer = setInterval(function() {
+                            btCountdown--;
+                            document.getElementById("bt-countdown").textContent = btCountdown;
+                            if (btCountdown <= 0) {
+                                clearInterval(btTimer);
+                                if (btAutoContinue) {
+                                    document.getElementById("bt-timer").innerHTML = "جاري بدء الدفعة التالية...";
+                                    setTimeout(function() {
+                                        document.querySelector(\'form[name="bt_reindex_form"]\').submit();
+                                    }, 500);
+                                }
+                            }
+                        }, 1000);
+                    }
+                    
+                    // بدء العد التنازلي تلقائياً
+                    startCountdown();
+                    </script>';
+                } else {
+                    echo "<p style='color:blue'>✅ اكتملت معالجة جميع الأحداث!</p>";
+                }
             } else {
                 echo "<p style='color:blue'>لا توجد أحداث متبقية للمعالجة!</p>";
             }
@@ -9067,7 +9122,7 @@ class SO_Admin_UI {
                 </div>
             </div>
 
-            <form method="post" style="margin-top:20px;">
+            <form method="post" name="bt_reindex_form" style="margin-top:20px;">
                 <?php wp_nonce_field('bt_reindex_action', 'bt_reindex_nonce'); ?>
                 <label>
                     <strong>حجم الدفعة:</strong>
@@ -9482,7 +9537,7 @@ class SO_Admin_UI {
         if (empty($token) || empty($chats)) { wp_send_json_error(['message'=>'يرجى إدخال التوكن وقائمة الغرف أولاً']); }
         $ok = false;
         foreach ($chats as $chat_id) {
-            $res = so_safe_remote_post("https://api.telegram.org/bot{$token}/sendMessage", ['headers'=>['Content-Type'=>'application/json'],'body'=>wp_json_encode(['chat_id'=>$chat_id,'text'=>'✅ اختبار ناجح من Beiruttime OSINT Pro V13 — نظام الرصد الاستخباراتي الموحد','parse_mode'=>'HTML']),'timeout'=>10]);
+            $res = so_safe_remote_post("https://api.telegram.org/bot{$token}/sendMessage", ['headers'=>['Content-Type'=>'application/json'],'body'=>wp_json_encode(['chat_id'=>$chat_id,'text'=>'✅ اختبار ناجح من Beiruttime OSINT System V.Beta 111 — نظام الرصد الاستخباراتي الموحد','parse_mode'=>'HTML']),'timeout'=>10]);
             if (!is_wp_error($res)) { $body = json_decode(wp_remote_retrieve_body($res),true); if (!empty($body['ok'])) $ok = true; }
         }
         $ok ? wp_send_json_success(['message'=>'تم الإرسال بنجاح']) : wp_send_json_error(['message'=>'فشل الإرسال — تحقق من التوكن وصلاحيات البوت']);
@@ -9547,7 +9602,7 @@ class SO_Admin_UI {
         <div class="so-admin-page">
         <div class="so-admin-header">
             <div>
-                <h1 class="so-admin-title">🛰️ Beiruttime OSINT Pro — النسخة الموحدة V13</h1>
+                <h1 class="so-admin-title">🛰️ Beiruttime OSINT System — النسخة الموحدة V.Beta 111</h1>
                 <p class="so-admin-subtitle">نظام الرصد الاستخباراتي الشامل | محرك V11 + لوحات V12 في ملف واحد</p>
             </div>
             <div class="so-admin-status">
@@ -9600,7 +9655,7 @@ class SO_Admin_UI {
         $api_key = get_option('so_external_api_key','');
         ?>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
-            <?php $stats=[['إجمالي الأحداث',number_format((int)$total_events),'📊','kpi-info'],['حرجة (٢٤س)',number_format((int)$critical_24h),'🚨','kpi-danger'],['المصادر النشطة',number_format($sources_count),'📡','kpi-neutral'],['الإصدار','V13.0.0','🛰️','kpi-neutral']];
+            <?php $stats=[['إجمالي الأحداث',number_format((int)$total_events),'📊','kpi-info'],['حرجة (٢٤س)',number_format((int)$critical_24h),'🚨','kpi-danger'],['المصادر النشطة',number_format($sources_count),'📡','kpi-neutral'],['الإصدار','V.Beta 111','🛰️','kpi-neutral']];
             foreach($stats as $s): ?>
             <div class="so-admin-card" style="text-align:center;padding:16px;">
                 <div style="font-size:26px;margin-bottom:6px;"><?php echo $s[2]; ?></div>
@@ -14272,7 +14327,7 @@ if (!function_exists('so_add_modern_enhancements')) {
             // 6. إشعار ترحيبي أول مرة
             if (!localStorage.getItem('so_welcome_shown')) {
                 setTimeout(() => {
-                    soToast('✨ مرحباً بك في Beiruttime OSINT Pro V17 — تجربة استخباراتية عصرية', 'info', 5000);
+                    soToast('✨ مرحباً بك في Beiruttime OSINT System V.Beta 111 — تجربة استخباراتية عصرية', 'info', 5000);
                     localStorage.setItem('so_welcome_shown', '1');
                 }, 2000);
             }
