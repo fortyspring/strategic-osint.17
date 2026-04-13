@@ -6280,6 +6280,13 @@ function sod_render_dashboard_route_content(): string {
     $parts = [];
     $top_ad = trim((string)get_option('sod_dashboard_top_ad_code', ''));
     $bottom_ad = trim((string)get_option('sod_dashboard_bottom_ad_code', ''));
+    $ga_code = trim((string)get_option('sod_dashboard_ga_code', ''));
+    
+    // إضافة كود تتبع جوجل في البداية
+    if ($ga_code !== '') {
+        $parts[] = '<!-- Google Analytics -->' . $ga_code;
+    }
+    
     if ($top_ad !== '') {
         $parts[] = '<div class="sod-dashboard-ad sod-dashboard-ad-top">' . $top_ad . '</div>';
     }
@@ -9046,6 +9053,7 @@ class SO_Admin_UI {
             }
             if (isset($_POST['sod_dashboard_top_ad_code'])) update_option('sod_dashboard_top_ad_code', wp_kses_post(wp_unslash($_POST['sod_dashboard_top_ad_code'])));
             if (isset($_POST['sod_dashboard_bottom_ad_code'])) update_option('sod_dashboard_bottom_ad_code', wp_kses_post(wp_unslash($_POST['sod_dashboard_bottom_ad_code'])));
+            if (isset($_POST['sod_dashboard_ga_code'])) update_option('sod_dashboard_ga_code', wp_kses_post(wp_unslash($_POST['sod_dashboard_ga_code'])));
 
             $old_slug = sod_dashboard_slug();
             $route_enabled = !empty($_POST['sod_dashboard_route_enabled']) ? 1 : 0;
@@ -10220,6 +10228,11 @@ class SO_Admin_UI {
             <div class="so-field-row">
                 <label class="so-field-label">كود إعلان أسفل اللوحة</label>
                 <textarea class="so-input" name="sod_dashboard_bottom_ad_code" rows="4" placeholder="Google Ads code"><?php echo esc_textarea(get_option('sod_dashboard_bottom_ad_code', '')); ?></textarea>
+            </div>
+            <div class="so-field-row">
+                <label class="so-field-label">كود تتبع جوجل (Google Analytics)</label>
+                <textarea class="so-input" name="sod_dashboard_ga_code" rows="4" placeholder="G-XXXXXXXXXX أو كود GA4 الكامل"><?php echo esc_textarea(get_option('sod_dashboard_ga_code', '')); ?></textarea>
+                <div style="font-size:11px;color:#4a6a8a;margin-top:6px;">أضف كود تتبع Google Analytics لقياس عدد الزوار. يمكن أن يكون معرّف القياس (G-XXXXXXXXXX) أو كود التتبع الكامل.</div>
             </div>
         </div>
         <button type="submit" name="so_save_dashboards" class="so-btn">💾 حفظ إعدادات اللوحات</button>
