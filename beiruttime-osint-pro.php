@@ -19,6 +19,10 @@ if (is_dir($sod_inc_base)) {
     require_once $sod_inc_base . '/classifier-service.php';
     require_once $sod_inc_base . '/newslog-service.php';
 }
+require_once __DIR__ . '/includes/class-hybrid-warfare-integrator.php';
+
+// تضمين تحديث الحرب المركبة وحقول OSINT المتقدمة
+require_once __DIR__ . '/osint-hybrid-warfare-update.php';
 
 function sod_has_arabic_chars(string $text): bool {
     return $text !== '' && preg_match('/\p{Arabic}/u', $text) === 1;
