@@ -4257,9 +4257,9 @@ function sod_verify_nonce(): bool {
 // ==========================================================================
 
 add_action('wp_ajax_sod_get_dashboard_data',        'sod_ajax_dashboard_data_v2');
-add_action('wp_ajax_nopriv_sod_get_dashboard_data', 'sod_ajax_dashboard_data_v2');
+// تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
 function sod_ajax_dashboard_data(): void {
-    if (!sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
+    if (!current_user_can('read') || !sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
     $hours=(int)($_POST['hours']??24); $region=sanitize_text_field(wp_unslash($_POST['region']??'all')); $min_score=max(0,(int)($_POST['min_score']??0));
     $events=sod_get_events(['hours'=>max(1,min(8760,$hours)),'region'=>$region,'min_score'=>$min_score,'limit'=>2000]);
     $analytics=sod_build_analytics($events);
@@ -4268,9 +4268,9 @@ function sod_ajax_dashboard_data(): void {
 }
 
 add_action('wp_ajax_sod_get_ticker_data',        'sod_ajax_ticker_data_v2');
-add_action('wp_ajax_nopriv_sod_get_ticker_data', 'sod_ajax_ticker_data_v2');
+// تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
 function sod_ajax_ticker_data(): void {
-    if (!sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
+    if (!current_user_can('read') || !sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
     $events=sod_get_events(['hours'=>6,'min_score'=>0,'limit'=>80]);
     $critical=array_filter($events,fn($e)=>(int)($e['score']??0)>=140);
     $region_scores=[];
@@ -4283,9 +4283,9 @@ function sod_ajax_ticker_data(): void {
 }
 
 add_action('wp_ajax_sod_get_threat_analysis',        'sod_ajax_threat_analysis_v2');
-add_action('wp_ajax_nopriv_sod_get_threat_analysis', 'sod_ajax_threat_analysis_v2');
+// تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
 function sod_ajax_threat_analysis(): void {
-    if (!sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
+    if (!current_user_can('read') || !sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
     $events_72h=sod_get_events(['hours'=>72,'limit'=>1000]);
     $events_24h=array_values(array_filter($events_72h,fn($e)=>(int)($e['event_timestamp']??0)>=time()-86400));
     $analytics_24h=sod_build_analytics($events_24h);$analytics_72h=sod_build_analytics($events_72h);
@@ -4301,8 +4301,9 @@ function sod_ajax_threat_analysis(): void {
 }
 
 add_action('wp_ajax_so_get_critical_popup',        'so_ajax_get_critical_popup_v2');
-add_action('wp_ajax_nopriv_so_get_critical_popup', 'so_ajax_get_critical_popup_v2');
+// تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
 function so_ajax_get_critical_popup(): void {
+    if (!current_user_can('read')) { wp_send_json_error(['message'=>'غير مصرح'],403); }
     $threshold=(int)get_option('so_popup_threshold',170);
     $recent_minutes=(int)get_option('so_popup_recent_minutes',20);
     $cutoff=time()-($recent_minutes*60);
@@ -4321,9 +4322,9 @@ function so_ajax_manual_sync(): void {
 }
 
 add_action('wp_ajax_sod_get_ai_brief', 'sod_ajax_ai_brief_v2');
-add_action('wp_ajax_nopriv_sod_get_ai_brief', 'sod_ajax_ai_brief_v2');
+// تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
 function sod_ajax_ai_brief(): void {
-    if (!sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
+    if (!current_user_can('read') || !sod_verify_nonce()) { wp_send_json_error(['message'=>'خطأ في التحقق'],403); }
     $events=sod_get_events(['hours'=>24,'limit'=>20,'min_score'=>80]);
     $brief=SO_LLM_Engine::generate_intel_brief($events);
     wp_send_json_success(['brief'=>$brief,'time'=>time()]);
@@ -5420,8 +5421,12 @@ class SO_Executive_Reports {
             $parts = explode('base64,', $payload, 2);
             $payload = (string)($parts[1] ?? '');
         }
+        // التحقق من أن البيانات base64 صالحة قبل فك التشفير
+        if (!preg_match('/^[A-Za-z0-9+\/=]+$/', $payload)) return false;
         $binary = base64_decode($payload, true);
         if ($binary === false || $binary === '') return false;
+        // التحقق من أن الملف هو PDF صالح (magic bytes)
+        if (strlen($binary) < 4 || substr($binary, 0, 4) !== '%PDF') return false;
         $tmp = wp_tempnam('beiruttime-exec-report.pdf');
         if (!$tmp) return false;
         $written = @file_put_contents($tmp, $binary);
@@ -5446,6 +5451,10 @@ class SO_Executive_Reports {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        // تعطيل إعادة التوجيه التلقائي لأسباب أمنية
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
         $body = curl_exec($ch);
         $errno = curl_errno($ch);
         $error = curl_error($ch);
@@ -13021,7 +13030,7 @@ if (!class_exists('SO_V11_INSIDE_PBI_DASHBOARD')) {
 class SO_V11_INSIDE_PBI_DASHBOARD {
     public static function init() {
         add_action('wp_ajax_so_v11_inside_pbi_snapshot',[__CLASS__,'ajax_snapshot']);
-        add_action('wp_ajax_nopriv_so_v11_inside_pbi_snapshot',[__CLASS__,'ajax_snapshot']);
+        // تم إزالة wp_ajax_nopriv - يتطلب الآن صلاحيات مستخدم
         add_action('wp_footer',[__CLASS__,'render_assets'],130);
     }
     public static function recent_events($limit=25) {
@@ -13030,6 +13039,7 @@ class SO_V11_INSIDE_PBI_DASHBOARD {
         return is_array($rows)?$rows:[];
     }
     public static function ajax_snapshot() {
+        if (!current_user_can('read')) { wp_send_json_error(['message'=>'غير مصرح'],403); }
         $events=self::recent_events(25);
         foreach($events as &$e){$e['title']=wp_strip_all_tags((string)($e['title']??''));$e['region']=sanitize_text_field((string)($e['region']??'غير محدد'));$e['actor_v2']=sanitize_text_field((string)($e['actor_v2']??'غير محدد'));$e['score']=intval($e['score']??0);}
         wp_send_json_success(['events'=>$events]);
