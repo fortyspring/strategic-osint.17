@@ -263,50 +263,53 @@ class HybridWarfareEngine {
      * الحصول على نمط التوليفة
      */
     private function getCombinationPattern(array $combo): ?array {
+        // تحويل المصفوفة إلى نص للمقارنة
+        $combo_key = implode('-', sort($combo) ?: $combo);
+        
         $patterns = [
-            ['military', 'energy'] => [
+            'energy-military' => [
                 'name' => 'استهداف البنية التحتية الحيوية',
                 'threat' => 'critical',
                 'desc' => 'هجوم عسكري على منشآت الطاقة يشير إلى استراتيجية شل القدرات'
             ],
-            ['military', 'political'] => [
+            'military-political' => [
                 'name' => 'ضغط عسكري-سياسي متكامل',
                 'threat' => 'high',
                 'desc' => 'تنسيق بين الفعل الميداني والضغط الدبلوماسي'
             ],
-            ['cyber', 'military'] => [
+            'cyber-military' => [
                 'name' => 'حرب هجينة رقمية-عسكرية',
                 'threat' => 'high',
                 'desc' => 'هجمات سيبرانية تمهد أو ترافق عمليات عسكرية'
             ],
-            ['economic', 'political'] => [
+            'economic-political' => [
                 'name' => 'حصار اقتصادي-سياسي',
                 'threat' => 'high',
                 'desc' => 'استخدام العقوبات والضغوط الدبلوماسية كأداة حرب'
             ],
-            ['media_psychological', 'social'] => [
+            'media_psychological-social' => [
                 'name' => 'حرب نفسية-اجتماعية',
                 'threat' => 'medium',
                 'desc' => 'استهداف المعنويات والرأي العام عبر الإعلام'
             ],
-            ['geostrategic', 'economic'] => [
+            'geostrategic-economic' => [
                 'name' => 'سيطرة على الممرات الاستراتيجية',
                 'threat' => 'high',
                 'desc' => 'التحكم في طرق التجارة والإمداد العالمية'
             ],
-            ['security', 'military'] => [
+            'security-military' => [
                 'name' => 'عملية أمنية-عسكرية مشتركة',
                 'threat' => 'medium',
                 'desc' => 'تنسيق بين الأجهزة الأمنية والقوات العسكرية'
             ]
         ];
         
+        // ترتيب المصفوفة لإنشاء المفتاح
         sort($combo);
-        $key = implode('_', $combo);
+        $key = implode('-', $combo);
         
         foreach ($patterns as $patternCombo => $patternData) {
-            sort($patternCombo);
-            if (implode('_', $patternCombo) === $key) {
+            if ($patternCombo === $key) {
                 return $patternData;
             }
         }
