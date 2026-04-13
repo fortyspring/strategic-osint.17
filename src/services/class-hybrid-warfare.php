@@ -26,6 +26,14 @@ class HybridWarfareEngine {
     use Singleton;
 
     /**
+     * اختصار لـ getInstance() لتوافق الكود القديم
+     * @return self
+     */
+    public static function instance() {
+        return self::getInstance();
+    }
+
+    /**
      * طبقات الحرب المركبة التسع
      */
     private $hybridLayers = [

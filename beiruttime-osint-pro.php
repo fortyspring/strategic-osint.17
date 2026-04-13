@@ -8976,6 +8976,7 @@ class SO_Admin_UI {
         add_submenu_page('strategic-osint', 'سجل الأخبار', '📋 سجل الأخبار', 'manage_options', 'strategic-osint-newslog', [__CLASS__,'page_news_log']);
         add_submenu_page('strategic-osint', 'نشر يدوي', '📝 نشر يدوي', 'manage_options', 'strategic-osint-manual', [__CLASS__,'page_manual_post']);
         add_submenu_page('strategic-osint', 'استيراد وتصدير', '📦 استيراد / تصدير', 'manage_options', 'strategic-osint-io', [__CLASS__,'page_io']);
+        add_submenu_page('strategic-osint', 'إعادة بناء الأرشفة', '🔄 إعادة بناء الأرشفة', 'manage_options', 'strategic-osint-reindex', [__CLASS__,'page_reindex']);
     }
 
     public static function handle_saves() {
@@ -16861,6 +16862,99 @@ add_action('so_instant_alerts_cron', function(){
         so_maybe_run_threat_intel_ai();
     }
 }, 20);
+
+/**
+ * صفحة إعادة بناء الأرشفة
+ */
+public static function page_reindex() {
+    self::admin_wrap_open('🔄 إعادة بناء الأرشفة - تحليل الحرب المركبة');
+    
+    // تحميل خدمة إعادة الفهرسة
+    if (!class_exists('Beiruttime\\OSINT\\Services\\Batch_Reindexer')) {
+        require_once __DIR__ . '/src/services/class-batch-reindexer.php';
+    }
+    
+    $reindexer = new \Beiruttime\OSINT\Services\Batch_Reindexer();
+    $message = '';
+    $stats = [];
+    
+    // معالجة الطلب
+    if (isset($_POST['start_reindex']) && check_admin_referer('so_reindex_nonce')) {
+        $limit = isset($_POST['batch_limit']) ? intval($_POST['batch_limit']) : 100;
+        $result = $reindexer->run_batch($limit, 0, false);
+        $message = $result['message'];
+        $stats = $result['stats'];
+    }
+    
+    ?>
+    <style>
+    .so-reindex-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;margin:20px 0;}
+    .so-reindex-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;}
+    .so-stat-box{background:#0f172a;padding:16px;border-radius:8px;text-align:center;}
+    .so-stat-value{font-size:28px;font-weight:bold;color:#60a5fa;}
+    .so-stat-label{font-size:13px;color:#94a3b8;margin-top:4px;}
+    .so-reindex-btn{background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;padding:12px 24px;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;}
+    .so-reindex-btn:hover{background:linear-gradient(135deg,#1e40af,#1d4ed8);}
+    </style>
+    
+    <div class="so-reindex-card">
+        <h2>🔍 إعادة معالجة الأحداث القديمة</h2>
+        <p style="color:#94a3b8;">تقوم هذه الأداة بإعادة تحليل جميع الأحداث المخزنة في قاعدة البيانات باستخدام محركات الحرب المركبة المتقدمة لتحديث:</p>
+        <ul style="color:#94a3b8;line-height:1.8;">
+            <li>طبقات الحرب المركبة النشطة (Hybrid Layers)</li>
+            <li>درجات التهديد والتصعيد (Threat & Escalation Scores)</li>
+            <li>شبكة الفاعلين والعلاقات (Actor Network)</li>
+            <li>حالة التحقق ومؤشرات الثقة (Verification Status)</li>
+            <li>السيناريوهات المتوقعة والإنذار المبكر (Predictions)</li>
+        </ul>
+        
+        <?php if ($message): ?>
+        <div style="background:rgba(5,150,105,.2);border:1px solid #059669;color:#6ee7b7;padding:12px;border-radius:8px;margin:16px 0;">
+            ✅ <?php echo esc_html($message); ?>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($stats)): ?>
+        <div class="so-reindex-stats">
+            <div class="so-stat-box">
+                <div class="so-stat-value"><?php echo intval($stats['processed'] ?? 0); ?></div>
+                <div class="so-stat-label">تمت معالجته</div>
+            </div>
+            <div class="so-stat-box">
+                <div class="so-stat-value"><?php echo intval($stats['updated'] ?? 0); ?></div>
+                <div class="so-stat-label">تم تحديثه</div>
+            </div>
+            <div class="so-stat-box">
+                <div class="so-stat-value"><?php echo intval($stats['errors'] ?? 0); ?></div>
+                <div class="so-stat-label">أخطاء</div>
+            </div>
+            <div class="so-stat-box">
+                <div class="so-stat-value"><?php echo isset($stats['end_time'], $stats['start_time']) ? round($stats['end_time'] - $stats['start_time'], 2) : '0'; ?>ث</div>
+                <div class="so-stat-label">وقت التنفيذ</div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <form method="post" style="margin-top:24px;">
+            <?php wp_nonce_field('so_reindex_nonce'); ?>
+            <div style="margin-bottom:16px;">
+                <label style="color:#e2e8f0;display:block;margin-bottom:8px;">عدد الأحداث في كل دفعة:</label>
+                <input type="number" name="batch_limit" value="100" min="10" max="1000" step="50" style="padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#fff;width:120px;">
+                <span style="color:#64748b;font-size:12px;margin-left:12px;">يُوصى بـ 100-200 لتجنب ضغط السيرفر</span>
+            </div>
+            <button type="submit" name="start_reindex" class="so-reindex-btn">🚀 بدء إعادة المعالجة</button>
+        </form>
+        
+        <div style="margin-top:20px;padding:16px;background:rgba(29,78,216,.15);border:1px solid #1d4ed8;border-radius:8px;">
+            <strong style="color:#93c5fd;">💡 ملاحظة:</strong>
+            <span style="color:#94a3b8;font-size:13px;"> يمكن أيضاً استخدام WP-CLI للأرشيف الكبير:<br>
+            <code style="background:#0f172a;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:8px;">wp beiruttime reindex --limit=5000</code></span>
+        </div>
+    </div>
+    
+    <?php
+    self::admin_wrap_close();
+}
 
 add_shortcode('osint_threat_ai', function(){
     $alert = get_option('so_last_ti_ai_snapshot', []);

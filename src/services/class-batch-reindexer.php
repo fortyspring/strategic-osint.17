@@ -75,11 +75,11 @@ class Batch_Reindexer {
         }
 
         // تحميل محركات التحليل إذا لم تكن محملة
-        if (!class_exists('Beiruttime\OSINT\Services\Hybrid_Warfare_Engine')) {
-            require_once __DIR__ . '/class-hybrid-warfare-engine.php';
+        if (!class_exists('Beiruttime\OSINT\Services\HybridWarfareEngine')) {
+            require_once __DIR__ . '/class-hybrid-warfare.php';
         }
         
-        $hybrid_engine = \Beiruttime\OSINT\Services\Hybrid_Warfare_Engine::instance();
+        $hybrid_engine = \Beiruttime\OSINT\Services\HybridWarfareEngine::instance();
 
         foreach ($events as $event) {
             try {
