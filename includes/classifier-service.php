@@ -1,9 +1,32 @@
 <?php
-if (!defined('ABSPATH')) exit;
+/**
+ * Classifier Service
+ * 
+ * Provides context-aware classification for OSINT content.
+ * Uses pattern matching and context memory to identify actors and entities.
+ * 
+ * @package BeirutTime_OSINT_Pro
+ * @since 2.0.0
+ */
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Infer context from text using memory patterns
+ * 
+ * Analyzes text against stored patterns to identify primary actors
+ * and contextual relationships.
+ * 
+ * @param string $text The text to analyze
+ * @return array Context inference results with actor information
+ */
 function sod_context_memory_infer(string $text): array {
     $text = so_clean_text($text);
-    if ($text === '') return [];
+    if ($text === '') {
+        return [];
+    }
 
     $fp = so_build_title_fingerprint($text);
     $patterns = sod_context_memory_get();
@@ -11,15 +34,23 @@ function sod_context_memory_infer(string $text): array {
     $bestScore = 0.0;
 
     foreach (array_reverse($patterns) as $entry) {
-        if (!is_array($entry)) continue;
+        if (!is_array($entry)) {
+            continue;
+        }
         $entryTitle = so_clean_text((string)($entry['title'] ?? ''));
-        if ($entryTitle === '') continue;
+        if ($entryTitle === '') {
+            continue;
+        }
 
         $score = 0.0;
-        if ($fp !== '' && !empty($entry['fingerprint']) && $fp === $entry['fingerprint']) $score += 70;
+        if ($fp !== '' && !empty($entry['fingerprint']) && $fp === $entry['fingerprint']) {
+            $score += 70;
+        }
         similar_text(so_normalize_title_for_dedupe($text), so_normalize_title_for_dedupe($entryTitle), $pct);
         $score += ($pct / 100.0) * 40.0;
-        if (!empty($entry['actor_v2']) && in_array($entry['actor_v2'], ['فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'], true)) $score -= 35;
+        if (!empty($entry['actor_v2']) && in_array($entry['actor_v2'], ['فاعل غير محسوم', 'فاعل سياقي', 'فاعل سياقي غير مباشر'], true)) {
+            $score -= 35;
+        }
 
         if ($score > $bestScore) {
             $bestScore = $score;
@@ -27,7 +58,9 @@ function sod_context_memory_infer(string $text): array {
         }
     }
 
-    if ($bestScore < 60 || empty($best['actor_v2'])) return [];
+    if ($bestScore < 60 || empty($best['actor_v2'])) {
+        return [];
+    }
 
     return [
         'primary_actor' => (string)$best['actor_v2'],
@@ -39,9 +72,20 @@ function sod_context_memory_infer(string $text): array {
     ];
 }
 
+/**
+ * Extract named non-military actor from text
+ * 
+ * Uses pattern matching to identify actors, organizations, and entities
+ * mentioned in the text. Returns the first matched actor label.
+ * 
+ * @param string $text The text to analyze
+ * @return string The identified actor label or empty string if none found
+ */
 function sod_extract_named_nonmilitary_actor(string $text): string {
     $text = so_clean_text($text);
-    if ($text === '') return '';
+    if ($text === '') {
+        return '';
+    }
 
     $patterns = [
         'الخارجية الإيرانية' => '/(الخارجية الإيرانية|وزارة الخارجية الإيرانية|عراقجي|وزير الخارجية الايراني|وزير الخارجية الإيراني)/ui',

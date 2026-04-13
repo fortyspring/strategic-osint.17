@@ -17,25 +17,41 @@
         "phpunit/phpunit": "^9.0",
         "yoast/phpunit-polyfills": "^1.0",
         "wp-coding-standards/wpcs": "^2.3",
-        "phpcompatibility/phpcompatibility-wp": "^2.1"
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/phpstan": "^1.0",
+        "infection/infection": "^0.26.0"
     },
     "autoload": {
         "psr-4": {
-            "OSINT\\": "includes/"
-        }
+            "OSINT\\Pro\\": "src/",
+            "OSINT\\Pro\\Core\\": "src/core/",
+            "OSINT\\Pro\\Services\\": "src/services/",
+            "OSINT\\Pro\\Traits\\": "src/traits/",
+            "OSINT\\Pro\\Utils\\": "src/utils/",
+            "OSINT\\Pro\\Includes\\": "includes/"
+        },
+        "files": [
+            "includes/modules/class-module-interface.php",
+            "includes/modules/class-base-module.php"
+        ]
     },
     "scripts": {
         "test": "phpunit",
         "test:cache": "phpunit --group cache",
         "test:websocket": "phpunit --group websocket",
         "test:module": "phpunit --group module",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "test:mutation": "infection --threads=4",
         "lint": "phpcs --standard=WordPress",
-        "lint:fix": "phpcbf --standard=WordPress"
+        "lint:fix": "phpcbf --standard=WordPress",
+        "analyze": "phpstan analyze src includes --level 5",
+        "docs": "phpdoc -d src,includes -t docs"
     },
     "config": {
         "allow-plugins": {
             "composer/installers": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "infection/extension-installer": true
         }
     }
 }

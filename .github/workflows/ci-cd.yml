@@ -1,0 +1,103 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2']
+    
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        ports:
+          - 3306:3306
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: mbstring, intl, mysql, redis, memcached
+        coverage: xdebug
+        tools: composer:v2
+    
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress
+    
+    - name: Run linting
+      run: composer run-script lint
+    
+    - name: Run static analysis
+      run: composer run-script analyze
+    
+    - name: Run unit tests
+      run: composer run-script test
+      env:
+        WP_TESTS_DIR: /tmp/wordpress-tests-lib
+        WP_DB_NAME: wordpress_test
+        WP_DB_USER: root
+        WP_DB_PASSWORD: root
+        WP_DB_HOST: 127.0.0.1
+    
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/clover.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        tools: composer:v2
+    
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress --optimize-autoloader --no-dev
+    
+    - name: Create release package
+      run: |
+        mkdir -p release
+        rsync -av --exclude='.git' --exclude='tests' --exclude='.github' \
+              --exclude='composer.json' --exclude='phpunit.xml' \
+              --exclude='*.md' --exclude='coverage' \
+              ./ release/beiruttime-osint-pro/
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: beiruttime-osint-pro
+        path: release/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy notification
+      run: |
+        echo "Deployment ready for manual review"
+        # Add deployment steps here (e.g., WordPress.org SVN, FTP, etc.)
