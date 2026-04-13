@@ -20,10 +20,19 @@ if (is_dir($sod_inc_base)) {
     require_once $sod_inc_base . '/newslog-service.php';
 }
 
+// تحميل السمات المساعدة (Traits)
+require_once __DIR__ . '/src/traits/trait-singleton.php';
+require_once __DIR__ . '/src/traits/trait-loggable.php';
+
 // تحميل ملفات الحرب المركبة والتكامل
 require_once __DIR__ . '/osint-hybrid-warfare-update.php';
 require_once $sod_inc_base . '/class-hybrid-warfare-integrator.php';
 require_once $sod_inc_base . '/class-entity-relations-manager.php';
+
+// تحميل محركات الخدمات الحديثة
+require_once __DIR__ . '/src/services/class-hybrid-warfare.php';
+require_once __DIR__ . '/src/services/class-verification.php';
+require_once __DIR__ . '/src/services/class-early-warning.php';
 
 
 function sod_has_arabic_chars(string $text): bool {
@@ -13884,6 +13893,14 @@ add_action('plugins_loaded', function() {
 
 add_action('init', function() {
     // sod_command_deck, strategic_osint_v7_brief, beiruttime_command_center registered via add_shortcode above
+    
+    // تهيئة محركات الحرب المركبة والعلاقات
+    if (class_exists('SO_Hybrid_Warfare_Integrator')) {
+        SO_Hybrid_Warfare_Integrator::init();
+    }
+    if (class_exists('SO_Entity_Relations_Manager')) {
+        SO_Entity_Relations_Manager::init();
+    }
 });
 // ==========================================================================
 // 25. إضافات عصرية وتجربة مستخدم محسّنة (آمنة للإضافة في أي وقت)
