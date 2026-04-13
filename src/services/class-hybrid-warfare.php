@@ -263,8 +263,14 @@ class HybridWarfareEngine {
      * الحصول على نمط التوليفة
      */
     private function getCombinationPattern(array $combo): ?array {
-        // تحويل المصفوفة إلى نص للمقارنة
-        $combo_key = implode('-', sort($combo) ?: $combo);
+        if (empty($combo)) {
+            return null;
+        }
+        
+        // ترتيب المصفوفة لإنشاء المفتاح
+        $sortedCombo = $combo;
+        sort($sortedCombo);
+        $key = implode('-', $sortedCombo);
         
         $patterns = [
             'energy-military' => [
@@ -303,10 +309,6 @@ class HybridWarfareEngine {
                 'desc' => 'تنسيق بين الأجهزة الأمنية والقوات العسكرية'
             ]
         ];
-        
-        // ترتيب المصفوفة لإنشاء المفتاح
-        sort($combo);
-        $key = implode('-', $combo);
         
         foreach ($patterns as $patternCombo => $patternData) {
             if ($patternCombo === $key) {
