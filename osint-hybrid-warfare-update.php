@@ -569,7 +569,7 @@ function sod_advanced_verification($event_data) {
     } elseif ($confidence >= 60) {
         $verification['status'] = 'محتمل';
     } elseif ($confidence >= 40) {
-        $verification['status'] => 'تقارير أولية';
+        $verification['status'] = 'تقارير أولية';
     } elseif ($verification['source_conflict']) {
         $verification['status'] = 'متضارب';
     } else {
