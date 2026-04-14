@@ -28,11 +28,11 @@
             "Beiruttime\\OSINT\\Services\\": "src/services/",
             "Beiruttime\\OSINT\\Traits\\": "src/traits/",
             "Beiruttime\\OSINT\\Utils\\": "src/utils/",
-            "Beiruttime\\OSINT\\Includes\\": "includes/"
+            "Beiruttime\\OSINT\\Modules\\": "src/modules/"
         },
         "files": [
-            "includes/modules/class-module-interface.php",
-            "includes/modules/class-base-module.php"
+            "src/modules/class-module-interface.php",
+            "src/modules/class-base-module.php"
         ]
     },
     "scripts": {
@@ -44,8 +44,8 @@
         "test:mutation": "infection --threads=4",
         "lint": "phpcs --standard=WordPress",
         "lint:fix": "phpcbf --standard=WordPress",
-        "analyze": "phpstan analyze src includes --level 5",
-        "docs": "phpdoc -d src,includes -t docs"
+        "analyze": "phpstan analyze src --level 5",
+        "docs": "phpdoc -d src -t docs"
     },
     "config": {
         "allow-plugins": {
