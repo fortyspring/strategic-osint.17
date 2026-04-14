@@ -206,11 +206,13 @@ function sod_get_layer_name_ar($layer_key) {
 }
 
 /**
- * قص النص بأمان
+ * قص النص بأمان (تجنب إعادة التعريف إذا كانت موجودة)
  */
-function sod_safe_substr($text, $start, $length) {
-    if (empty($text)) return '';
-    return mb_substr(strip_tags($text), $start, $length, 'UTF-8');
+if (!function_exists('sod_safe_substr')) {
+    function sod_safe_substr($text, $start, $length) {
+        if (empty($text)) return '';
+        return mb_substr(strip_tags($text), $start, $length, 'UTF-8');
+    }
 }
 
 /**
