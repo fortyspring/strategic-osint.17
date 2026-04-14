@@ -4316,7 +4316,6 @@ class SO_Alert_Dispatcher {
         return $names[$type_key] ?? $type_key;
     }
 }
-}
 
 // ==========================================================================
 // 13. REST API Manager
@@ -17378,4 +17377,3 @@ function so_ma_admin_footer_panel() {
     </script>';
 }
 add_action('admin_footer', 'so_ma_admin_footer_panel', 99);
-}
