@@ -4093,7 +4093,11 @@ class SO_Alert_Dispatcher {
         if ($score >= 100) return 0xEAB308;
         return 0x2563EB;
     }
-    public static function send_discord($item): bool {
+    
+    /**
+     * إرسال إلى ديسكورد مع قالب مخصص
+     */
+    public static function send_discord($item, $template_fields = []): bool {
         $webhook = trim((string)get_option('so_discord_webhook', ''));
         if ($webhook === '' || !filter_var($webhook, FILTER_VALIDATE_URL)) return false;
 
@@ -4112,19 +4116,110 @@ class SO_Alert_Dispatcher {
         $link = so_normalize_event_link((string)($item['link'] ?? ''));
         $image_url = trim((string)($item['image_url'] ?? ''));
         $timestamp = !empty($item['event_timestamp']) ? gmdate('c', (int)$item['event_timestamp']) : gmdate('c');
+        
+        // حقول الحرب المركبة
+        $hybrid_layers = !empty($item['hybrid_layers']) ? json_decode($item['hybrid_layers'], true) : [];
+        $osint_type = sanitize_text_field($item['osint_type'] ?? '');
+        $threat_score = (int)($item['threat_score'] ?? 0);
+        $risk_level = sanitize_text_field($item['risk_level'] ?? '');
+        $primary_actor = sanitize_text_field($item['primary_actor'] ?? '');
 
-        $fields = [
-            ['name' => 'المصدر', 'value' => $source !== '' ? $source : 'غير محدد', 'inline' => true],
-            ['name' => 'التصنيف', 'value' => $intel !== '' ? $intel : 'غير محدد', 'inline' => true],
-            ['name' => 'المستوى', 'value' => $level !== '' ? $level : 'غير محدد', 'inline' => true],
-            ['name' => 'الفاعل', 'value' => $actor !== '' ? $actor : 'فاعل غير محسوم', 'inline' => true],
-            ['name' => 'المنطقة', 'value' => $region !== '' ? $region : 'غير محدد', 'inline' => true],
-            ['name' => 'الخطورة', 'value' => (string)$score, 'inline' => true],
-        ];
-        if ($target !== '')  $fields[] = ['name' => 'الهدف', 'value' => $target, 'inline' => true];
-        if ($intent !== '')  $fields[] = ['name' => 'النية', 'value' => $intent, 'inline' => true];
-        if ($context !== '') $fields[] = ['name' => 'السياق', 'value' => $context, 'inline' => true];
-        if ($weapon !== '')  $fields[] = ['name' => 'الوسيلة', 'value' => $weapon, 'inline' => true];
+        // بناء الحقول بناءً على القالب المخصص
+        $fields = [];
+        
+        // إذا تم تحديد حقول مخصصة
+        if (!empty($template_fields) && is_array($template_fields)) {
+            foreach ($template_fields as $field_key => $show_field) {
+                if (!$show_field) continue;
+                
+                switch ($field_key) {
+                    case 'source':
+                        $fields[] = ['name' => 'المصدر', 'value' => $source !== '' ? $source : 'غير محدد', 'inline' => true];
+                        break;
+                    case 'classification':
+                        $fields[] = ['name' => 'التصنيف', 'value' => $intel !== '' ? $intel : 'غير محدد', 'inline' => true];
+                        break;
+                    case 'level':
+                        $fields[] = ['name' => 'المستوى', 'value' => $level !== '' ? $level : 'غير محدد', 'inline' => true];
+                        break;
+                    case 'actor':
+                        $fields[] = ['name' => 'الفاعل', 'value' => $actor !== '' ? $actor : 'فاعل غير محسوم', 'inline' => true];
+                        break;
+                    case 'region':
+                        $fields[] = ['name' => 'المنطقة', 'value' => $region !== '' ? $region : 'غير محدد', 'inline' => true];
+                        break;
+                    case 'score':
+                        $fields[] = ['name' => 'الخطورة', 'value' => (string)$score, 'inline' => true];
+                        break;
+                    case 'threat_score':
+                        if ($threat_score > 0) {
+                            $fields[] = ['name' => 'درجة التهديد', 'value' => $threat_score . '/100', 'inline' => true];
+                        }
+                        break;
+                    case 'risk_level':
+                        if (!empty($risk_level)) {
+                            $fields[] = ['name' => 'مستوى الخطر', 'value' => $risk_level, 'inline' => true];
+                        }
+                        break;
+                    case 'osint_type':
+                        if (!empty($osint_type)) {
+                            $layer_name = self::get_osint_type_name($osint_type);
+                            $fields[] = ['name' => 'نوع OSINT', 'value' => $layer_name, 'inline' => true];
+                        }
+                        break;
+                    case 'hybrid_layers':
+                        if (!empty($hybrid_layers) && is_array($hybrid_layers)) {
+                            $layers_text = implode(', ', array_keys($hybrid_layers));
+                            $fields[] = ['name' => 'طبقات الحرب المركبة', 'value' => $layers_text, 'inline' => false];
+                        }
+                        break;
+                    case 'target':
+                        if ($target !== '') $fields[] = ['name' => 'الهدف', 'value' => $target, 'inline' => true];
+                        break;
+                    case 'intent':
+                        if ($intent !== '') $fields[] = ['name' => 'النية', 'value' => $intent, 'inline' => true];
+                        break;
+                    case 'context':
+                        if ($context !== '') $fields[] = ['name' => 'السياق', 'value' => $context, 'inline' => true];
+                        break;
+                    case 'weapon':
+                        if ($weapon !== '') $fields[] = ['name' => 'الوسيلة', 'value' => $weapon, 'inline' => true];
+                        break;
+                    case 'primary_actor':
+                        if (!empty($primary_actor)) {
+                            $fields[] = ['name' => 'الفاعل الرئيسي', 'value' => $primary_actor, 'inline' => false];
+                        }
+                        break;
+                }
+            }
+        } else {
+            // الحقول الافتراضية
+            $fields = [
+                ['name' => 'المصدر', 'value' => $source !== '' ? $source : 'غير محدد', 'inline' => true],
+                ['name' => 'التصنيف', 'value' => $intel !== '' ? $intel : 'غير محدد', 'inline' => true],
+                ['name' => 'المستوى', 'value' => $level !== '' ? $level : 'غير محدد', 'inline' => true],
+                ['name' => 'الفاعل', 'value' => $actor !== '' ? $actor : 'فاعل غير محسوم', 'inline' => true],
+                ['name' => 'المنطقة', 'value' => $region !== '' ? $region : 'غير محدد', 'inline' => true],
+                ['name' => 'الخطورة', 'value' => (string)$score, 'inline' => true],
+            ];
+            if ($threat_score > 0) $fields[] = ['name' => 'درجة التهديد', 'value' => $threat_score . '/100', 'inline' => true];
+            if (!empty($risk_level)) $fields[] = ['name' => 'مستوى الخطر', 'value' => $risk_level, 'inline' => true];
+            if ($target !== '')  $fields[] = ['name' => 'الهدف', 'value' => $target, 'inline' => true];
+            if ($intent !== '')  $fields[] = ['name' => 'النية', 'value' => $intent, 'inline' => true];
+            if ($context !== '') $fields[] = ['name' => 'السياق', 'value' => $context, 'inline' => true];
+            if ($weapon !== '')  $fields[] = ['name' => 'الوسيلة', 'value' => $weapon, 'inline' => true];
+            
+            // إضافة طبقات الحرب المركبة إذا وجدت
+            if (!empty($hybrid_layers) && is_array($hybrid_layers)) {
+                $layers_ar = [];
+                foreach (array_keys($hybrid_layers) as $layer_key) {
+                    $layers_ar[] = self::get_osint_type_name($layer_key);
+                }
+                if (!empty($layers_ar)) {
+                    $fields[] = ['name' => '🎯 طبقات الحرب المركبة', 'value' => implode(' • ', $layers_ar), 'inline' => false];
+                }
+            }
+        }
 
         $embed = [
             'title' => sod_safe_substr($title !== '' ? $title : 'Beiruttime OSINT Alert', 0, 250),
@@ -4132,7 +4227,7 @@ class SO_Alert_Dispatcher {
             'description' => "تنبيه استخباراتي من Beiruttime OSINT",
             'color' => self::discord_color_for_score($score),
             'fields' => $fields,
-            'footer' => ['text' => 'Beiruttime OSINT'],
+            'footer' => ['text' => 'Beiruttime OSINT - Hybrid Warfare Intelligence'],
             'timestamp' => $timestamp,
         ];
 
@@ -4156,6 +4251,24 @@ class SO_Alert_Dispatcher {
         if (is_wp_error($response)) return false;
         $code = (int)wp_remote_retrieve_response_code($response);
         return $code >= 200 && $code < 300;
+    }
+    
+    /**
+     * الحصول على اسم نوع OSINT بالعربية
+     */
+    private static function get_osint_type_name($type_key) {
+        $names = [
+            'military' => 'العسكرية',
+            'security' => 'الأمنية',
+            'cyber' => 'السيبرانية',
+            'political' => 'السياسية',
+            'economic' => 'الاقتصادية',
+            'social' => 'الاجتماعية',
+            'media_psychological' => 'الإعلامية والنفسية',
+            'energy' => 'الطاقة',
+            'geostrategic' => 'الجيوستراتيجية'
+        ];
+        return $names[$type_key] ?? $type_key;
     }
 }
 }
