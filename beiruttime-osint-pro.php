@@ -16,7 +16,6 @@ if (!defined('ABSPATH')) exit;
 
 // تحميل ملف bootstrap الرئيسي الذي يقوم بتحميل جميع المكونات
 require_once __DIR__ . '/src/bootstrap.php';
-require_once __DIR__ . '/class-smart-gatekeeper.php';
 
 
 function sod_has_arabic_chars(string $text): bool {
