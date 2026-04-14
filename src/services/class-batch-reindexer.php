@@ -94,29 +94,58 @@ class Batch_Reindexer {
                     'score' => $event['score']
                 ];
 
-                // 1. تحليل طبقات الحرب المركبة
-                $hybrid_analysis = $hybrid_engine->analyze_layers($event_data);
+                if (!$use_legacy && $hybrid_engine) {
+                    // 1. تحليل طبقات الحرب المركبة باستخدام المحرك الجديد
+                    $hybrid_analysis = $hybrid_engine->analyzeLayers($event_data);
+                    
+                    // تحويل النتيجة إلى صيغة قاعدة البيانات
+                    $layers_json = !empty($hybrid_analysis['layers']) ? json_encode($hybrid_analysis['layers'], JSON_UNESCAPED_UNICODE) : '';
+                    $primary_layer = $hybrid_analysis['primary_layer'] ?? '';
+                    $multi_domain = round($hybrid_analysis['composite_score'] ?? 0, 3);
+                } else {
+                    // استخدام الدوال القديمة كبديل
+                    $layers_json = $this->legacy_classify_hybrid_layers($event_data);
+                    $primary_layer = $this->legacy_get_primary_layer($layers_json);
+                    $multi_domain = $this->legacy_calculate_multi_domain($layers_json);
+                }
                 
                 // 2. حساب Scores المتقدم
-                $scores = $this->calculate_scores($event_data, $hybrid_analysis);
+                $scores = $this->calculate_scores($event_data, $layers_json);
                 
                 // 3. استخراج شبكة الفاعلين
                 $actor_network = $this->extract_actor_network($event_data);
 
                 if (!$dry_run) {
                     // تحديث السجل في قاعدة البيانات
-                    $update_data = array_merge(
-                        $hybrid_analysis,
-                        $scores,
-                        $actor_network,
-                        ['reindexed_at' => current_time('mysql')]
-                    );
+                    $update_data = [
+                        'hybrid_layers' => $layers_json,
+                        'osint_type' => $primary_layer,
+                        'multi_domain_score' => $multi_domain,
+                        'threat_score' => (int)$scores['threat_score'],
+                        'escalation_score' => (int)$scores['escalation_score'],
+                        'confidence_score' => (int)$scores['confidence_score'],
+                        'risk_level' => $scores['risk_level'],
+                        'primary_actor' => $actor_network['primary_actor'] ?? '',
+                        'actor_network' => $actor_network['actor_network'] ?? null,
+                        'reindexed_at' => current_time('mysql')
+                    ];
 
                     $wpdb->update(
                         $this->table_name,
                         $update_data,
                         ['id' => $event['id']],
-                        array_fill_keys(array_keys($update_data), '%s'),
+                        [
+                            'hybrid_layers' => '%s',
+                            'osint_type' => '%s',
+                            'multi_domain_score' => '%f',
+                            'threat_score' => '%d',
+                            'escalation_score' => '%d',
+                            'confidence_score' => '%d',
+                            'risk_level' => '%s',
+                            'primary_actor' => '%s',
+                            'actor_network' => '%s',
+                            'reindexed_at' => '%s'
+                        ],
                         ['id' => '%d']
                     );
 
@@ -158,39 +187,117 @@ class Batch_Reindexer {
     /**
      * حساب مؤشراتScores للحدث
      */
-    private function calculate_scores($event_data, $hybrid_analysis) {
-        // محاكاة مبسطة لحساب Scores (يمكن ربطها بالمحرك الحقيقي)
-        $layers_count = !empty($hybrid_analysis['hybrid_layers']) ? count(json_decode($hybrid_analysis['hybrid_layers'], true)) : 0;
+    private function calculate_scores($event_data, $layers_json) {
+        // حساب Scores بناءً على الطبقات النشطة
+        $layers_count = !empty($layers_json) ? count(json_decode($layers_json, true)) : 0;
         
-        $threat_score = min(100, ($layers_count * 15) + (stripos($event_data['title'], 'استهداف') !== false ? 20 : 0));
-        $escalation_score = min(100, ($layers_count * 10) + (stripos($event_data['title'], 'تصعيد') !== false ? 30 : 0));
-        $confidence_score = 75; // افتراضي
+        // كلمات مفتاحية لزيادة التهديد
+        $high_threat_keywords = ['استهداف', 'اغتيال', 'تصفية', 'تدمير', 'قصف', 'غارة'];
+        $escalation_keywords = ['تصعيد', 'تهديد', 'إنذار', 'حرب', 'مواجهة', 'انتقام'];
+        
+        $title = $event_data['title'] ?? '';
+        $threat_bonus = 0;
+        foreach ($high_threat_keywords as $keyword) {
+            if (stripos($title, $keyword) !== false) {
+                $threat_bonus += 10;
+            }
+        }
+        
+        $escalation_bonus = 0;
+        foreach ($escalation_keywords as $keyword) {
+            if (stripos($title, $keyword) !== false) {
+                $escalation_bonus += 15;
+            }
+        }
+        
+        $threat_score = min(100, ($layers_count * 12) + $threat_bonus);
+        $escalation_score = min(100, ($layers_count * 10) + $escalation_bonus);
+        $confidence_score = 70 + min(20, $layers_count * 3); // زيادة الثقة مع تعدد المصادر
         
         return [
             'threat_score' => $threat_score,
             'escalation_score' => $escalation_score,
             'confidence_score' => $confidence_score,
             'risk_level' => $threat_score > 70 ? 'حرج' : ($threat_score > 40 ? 'متوسط' : 'منخفض'),
-            'multi_domain_score' => $layers_count * 10
+            'multi_domain_score' => $layers_count * 0.12
         ];
     }
 
     /**
-     * استخراج شبكة الفاعلين بشكل مبسط
+     * دالة مساعدة لتصنيف الطبقات بالطريقة القديمة
      */
-    private function extract_actor_network($event_data) {
-        $actor = $event_data['actor_v2'] ?? '';
-        $network = [];
+    private function legacy_classify_hybrid_layers($event_data) {
+        $text = ($event_data['title'] ?? '') . ' ' . ($event_data['war_data'] ?? '');
+        $layers = [];
         
-        if (!empty($actor)) {
-            $network['primary'] = $actor;
-            // يمكن إضافة منطق ذكي هنا لاستخراج الراعي والممول من النص
+        $keywords_map = [
+            'military' => ['غارة', 'قصف', 'صاروخ', 'اشتباك', 'توغل', 'ضربة', 'دبابة', 'طائرة'],
+            'security' => ['اعتقال', 'مداهمة', 'تفكيك', 'خلية', 'أمن', 'حاجز'],
+            'cyber' => ['اختراق', 'سيبراني', 'تسريب', 'قرصنة', 'بيانات'],
+            'political' => ['تصريح', 'قرار', 'عقوبة', 'اتفاق', 'زيارة', 'وفد'],
+            'economic' => ['نفط', 'غاز', 'ميناء', 'اقتصاد', 'سوق', 'عملة'],
+            'social' => ['احتجاج', 'تحريض', 'تعبئة', 'شارع', 'مجتمع'],
+            'media_psychological' => ['دعاية', 'تضليل', 'إعلام', 'رواية'],
+            'energy' => ['كهرباء', 'محطة', 'طاقة', 'وقود', 'مصفاة'],
+            'geostrategic' => ['مضيق', 'ممر', 'قاعدة', 'استراتيجي', 'حدود']
+        ];
+        
+        foreach ($keywords_map as $layer => $keywords) {
+            $matches = [];
+            foreach ($keywords as $keyword) {
+                if (mb_stripos($text, $keyword) !== false) {
+                    $matches[] = $keyword;
+                }
+            }
+            if (!empty($matches)) {
+                $layers[$layer] = [
+                    'name_ar' => $this->get_layer_name_ar($layer),
+                    'score' => round(count($matches) / count($keywords), 3),
+                    'matches' => $matches
+                ];
+            }
         }
         
-        return [
-            'primary_actor' => $actor,
-            'actor_network' => !empty($network) ? json_encode($network, JSON_UNESCAPED_UNICODE) : null
+        return !empty($layers) ? json_encode($layers, JSON_UNESCAPED_UNICODE) : '';
+    }
+
+    private function get_layer_name_ar($layer) {
+        $names = [
+            'military' => 'الطبقة العسكرية',
+            'security' => 'الطبقة الأمنية',
+            'cyber' => 'الطبقة السيبرانية',
+            'political' => 'الطبقة السياسية',
+            'economic' => 'الطبقة الاقتصادية',
+            'social' => 'الطبقة الاجتماعية',
+            'media_psychological' => 'الطبقة الإعلامية',
+            'energy' => 'طبقة الطاقة',
+            'geostrategic' => 'الطبقة الجيوستراتيجية'
         ];
+        return $names[$layer] ?? $layer;
+    }
+
+    private function legacy_get_primary_layer($layers_json) {
+        if (empty($layers_json)) return '';
+        $layers = json_decode($layers_json, true);
+        if (empty($layers)) return '';
+        
+        $max_score = 0;
+        $primary = '';
+        foreach ($layers as $key => $data) {
+            $score = $data['score'] ?? 0;
+            if ($score > $max_score) {
+                $max_score = $score;
+                $primary = $key;
+            }
+        }
+        return $primary;
+    }
+
+    private function legacy_calculate_multi_domain($layers_json) {
+        if (empty($layers_json)) return 0;
+        $layers = json_decode($layers_json, true);
+        if (empty($layers)) return 0;
+        return round(min(1.0, count($layers) * 0.15), 3);
     }
 
     /**

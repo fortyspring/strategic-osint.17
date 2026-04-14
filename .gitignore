@@ -1,48 +1,60 @@
-# Environment
-.env
-.env.local
-*.env.*
-
-# Logs and temp files
+# Implementation and OSINT tools
 *.log
 *.tmp
 *.swp
-
-# Editors
-.vscode/
-.idea/
+*.env
+*.env.local
+.env.*
 
 # Dependencies
 node_modules/
-venv/
-.venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
+vendor/
 
 # Build artifacts
 dist/
 build/
 target/
-coverage/
-htmlcov/
-*.pyc
-*.class
-*.o
-*.exe
-*.dll
-*.so
-*.a
-*.obj
-*.out
 
-# System files
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# PHP specific
+*.php~
+*.php.bak
+*.bak
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
 .DS_Store
 Thumbs.db
-.zsh_history
-.bash_history
+desktop.ini
 
-# Compressed files
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Compressed archives
 *.zip
 *.gz
 *.tar
