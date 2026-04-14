@@ -1,8 +1,8 @@
 ```
-# Environment variables
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Logs
 *.log
@@ -10,18 +10,9 @@
 # Temporary files
 *.tmp
 *.swp
-*.swo
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# PHP specific
-*.php~
-phpunit.xml.dist
-composer.lock
 
 # Dependencies
+node_modules/
 vendor/
 
 # Build artifacts
@@ -29,43 +20,44 @@ dist/
 build/
 target/
 
-# IDE specific
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# Cache directories
-.cache/
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 .Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
 .coverage
-coverage/
-htmlcov/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/modules/
+*.sublime-workspace
+.pytest_cache/
+.mypy_cache/
 
-# Compression files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# PHP
+*.php~
+*.php.bak
+*.bak
+*.tmp
+composer.lock
+vendor/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 ```
