@@ -6099,7 +6099,6 @@ class SO_Executive_Reports {
         }
     }
 }
-}
 
 
 if (!function_exists('so_multi_actor_analysis')) {
@@ -6318,7 +6317,6 @@ function so_ma_admin_add_columns_css() {
     </style>';
 }
 add_action('admin_head', 'so_ma_admin_add_columns_css', 50);
-}
 
 // ==========================================================================
 // 15c. SO_Auto_Publisher_AI — النشر الآلي
@@ -16718,8 +16716,6 @@ class SO_Instant_Alerts {
     }
 }
 SO_Instant_Alerts::init();
-}
-
 
 
 // ==========================================================================
