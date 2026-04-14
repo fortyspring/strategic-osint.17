@@ -19,114 +19,31 @@ function sod_hybrid_warfare_add_advanced_fields() {
     global $wpdb;
     $table = $wpdb->prefix . 'so_news_events';
     
-    // قائمة الحقول الجديدة المطلوبة
+    // قائمة الحقول الأساسية الـ 15 الأكثر أهمية للأداء
+    // تم اختيارها بناءً على الاستخدام المتكرر في الاستعلامات والتحليل
     $fields = [
-        // حقول التصنيف المتقدم
+        // 1-5: حقول التصنيف والتهديد الأساسية
         ['name' => 'osint_type', 'type' => "varchar(100) DEFAULT 'عام'", 'desc' => 'نوع OSINT'],
-        ['name' => 'hybrid_layers', 'type' => "text NULL", 'desc' => 'طبقات الحرب المركبة (JSON)'],
-        ['name' => 'event_category', 'type' => "varchar(150) DEFAULT 'عام'", 'desc' => 'تصنيف الحدث'],
-        ['name' => 'strategic_category', 'type' => "varchar(150) DEFAULT 'عام'", 'desc' => 'التصنيف الاستراتيجي'],
-        ['name' => 'tactical_level', 'type' => "varchar(50) DEFAULT 'تكتيكي'", 'desc' => 'المستوى التكتيكي'],
-        ['name' => 'operational_level', 'type' => "varchar(50) DEFAULT 'عام'", 'desc' => 'المستوى العملياتي'],
+        ['name' => 'threat_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة التهديد'],
+        ['name' => 'escalation_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة التصعيد'],
+        ['name' => 'confidence_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة الثقة'],
+        ['name' => 'risk_level', 'type' => "varchar(50) DEFAULT 'منخفض'", 'desc' => 'مستوى الخطر'],
         
-        // حقول التأثير والوزن
-        ['name' => 'political_weight', 'type' => "int(11) DEFAULT 0", 'desc' => 'الوزن السياسي'],
-        ['name' => 'economic_weight', 'type' => "int(11) DEFAULT 0", 'desc' => 'الوزن الاقتصادي'],
-        ['name' => 'social_impact', 'type' => "int(11) DEFAULT 0", 'desc' => 'الأثر الاجتماعي'],
-        ['name' => 'cyber_impact', 'type' => "int(11) DEFAULT 0", 'desc' => 'الأثر السيبراني'],
-        
-        // حقول الفاعل وشبكة العلاقات
-        ['name' => 'primary_actor', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'الفاعل الرئيسي'],
-        ['name' => 'secondary_actor', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'الفاعل الثانوي'],
-        ['name' => 'actor_network', 'type' => "text NULL", 'desc' => 'شبكة الفاعلين (JSON)'],
-        ['name' => 'actor_relationships', 'type' => "text NULL", 'desc' => 'علاقات الفاعلين (JSON)'],
-        ['name' => 'sponsor_entity', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'الجهة الراعية'],
-        ['name' => 'funding_entity', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'الجهة الممولة'],
-        ['name' => 'media_operator', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'المشغل الإعلامي'],
-        
-        // حقول الموقع الجغرافي المتقدم
-        ['name' => 'geo_country', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الدولة'],
-        ['name' => 'geo_region', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الإقليم'],
-        ['name' => 'geo_city', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'المدينة'],
-        ['name' => 'geo_district', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'المنطقة/الحي'],
-        ['name' => 'geo_coordinates', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الإحداثيات (lat,lon)'],
-        ['name' => 'geo_accuracy', 'type' => "varchar(50) DEFAULT 'غير محدد'", 'desc' => 'دقة الموقع'],
-        ['name' => 'geo_sensitivity', 'type' => "varchar(100) DEFAULT 'عادية'", 'desc' => 'حساسية الموقع'],
-        
-        // حقول الزمن الدقيق
-        ['name' => 'event_start_time', 'type' => "bigint(20) DEFAULT 0", 'desc' => 'وقت بداية الحدث'],
-        ['name' => 'event_end_time', 'type' => "bigint(20) DEFAULT 0", 'desc' => 'وقت نهاية الحدث'],
-        ['name' => 'publish_delay', 'type' => "int(11) DEFAULT 0", 'desc' => 'فارق الزمن بين الحدث والنشر (ثواني)'],
-        ['name' => 'time_accuracy', 'type' => "varchar(50) DEFAULT 'غير محدد'", 'desc' => 'دقة التوقيت'],
-        
-        // حقول التحقق المتقدم
+        // 6-9: حقول التحقق الأساسية
         ['name' => 'verification_status', 'type' => "varchar(50) DEFAULT 'غير مؤكد'", 'desc' => 'حالة التحقق'],
         ['name' => 'verified_sources_count', 'type' => "int(11) DEFAULT 0", 'desc' => 'عدد المصادر المؤكدة'],
         ['name' => 'has_visual_evidence', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'وجود أدلة بصرية'],
-        ['name' => 'has_satellite_imagery', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'وجود صور أقمار صناعية'],
-        ['name' => 'has_official_statement', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'وجود بيان رسمي'],
-        ['name' => 'source_conflict', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'وجود تضارب بين المصادر'],
-        ['name' => 'verification_notes', 'type' => "text NULL", 'desc' => 'ملاحظات التحقق'],
         
-        // حقولScores المتقدمة
-        ['name' => 'sentiment_score', 'type' => "float DEFAULT 0", 'desc' => 'درجة التحليل العاطفي'],
-        ['name' => 'threat_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة التهديد'],
-        ['name' => 'escalation_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة التصعيد'],
-        ['name' => 'stability_index', 'type' => "float DEFAULT 0", 'desc' => 'مؤشر الاستقرار'],
-        ['name' => 'aggression_index', 'type' => "float DEFAULT 0", 'desc' => 'مؤشر العدوانية'],
-        ['name' => 'confidence_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة الثقة'],
-        ['name' => 'risk_level', 'type' => "varchar(50) DEFAULT 'منخفض'", 'desc' => 'مستوى الخطر'],
-        ['name' => 'impact_radius', 'type' => "varchar(100) DEFAULT 'محلي'", 'desc' => 'نطاق التأثير'],
-        ['name' => 'urgency_level', 'type' => "varchar(50) DEFAULT 'عادي'", 'desc' => 'مستوى الاستعجال'],
+        // 10-12: حقول الفاعل والموقع
+        ['name' => 'primary_actor', 'type' => "varchar(150) DEFAULT ''", 'desc' => 'الفاعل الرئيسي'],
+        ['name' => 'geo_country', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الدولة'],
+        ['name' => 'geo_coordinates', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الإحداثيات (lat,lon)'],
         
-        // حقول النية والسياق
-        ['name' => 'probable_intent', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'النية المرجحة'],
-        ['name' => 'probable_goal', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'الهدف المرجح'],
-        ['name' => 'political_driver', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'المحرك السياسي'],
-        ['name' => 'military_driver', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'المحرك العسكري'],
-        ['name' => 'economic_driver', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'المحرك الاقتصادي'],
-        ['name' => 'media_driver', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'المحرك الإعلامي'],
-        ['name' => 'trigger_event', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'الحدث المحفز'],
-        ['name' => 'general_context', 'type' => "text NULL", 'desc' => 'السياق العام'],
-        ['name' => 'linked_previous_event', 'type' => "bigint(20) DEFAULT 0", 'desc' => 'الرابط مع حدث سابق'],
-        ['name' => 'regional_file_link', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'الرابط مع ملف إقليمي'],
-        
-        // حقول النمط والتحليل
-        ['name' => 'pattern_type', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'نوع النمط'],
-        ['name' => 'pattern_frequency', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'تكرار النمط'],
-        ['name' => 'trend_direction', 'type' => "varchar(50) DEFAULT 'مستقر'", 'desc' => 'اتجاه الاتجاه'],
-        ['name' => 'cycle_detected', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'اكتشاف دورة متكررة'],
-        ['name' => 'recurrence_similarity', 'type' => "float DEFAULT 0", 'desc' => 'تشابه التكرار'],
-        ['name' => 'signature_behavior', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'سلوك بصمة الفاعل'],
-        ['name' => 'repeated_targeting', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'استهداف متكرر'],
-        ['name' => 'escalation_chain_id', 'type' => "varchar(64) DEFAULT ''", 'desc' => 'معرف سلسلة التصعيد'],
-        
-        // حقول التوقع والإنذار
-        ['name' => 'likely_scenario', 'type' => "text NULL", 'desc' => 'السيناريو المرجح'],
-        ['name' => 'alternative_scenario', 'type' => "text NULL", 'desc' => 'السيناريو البديل'],
-        ['name' => 'prediction_timeframe', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'الإطار الزمني للتوقع'],
-        ['name' => 'prediction_confidence', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة ثقة التوقع'],
-        ['name' => 'verification_indicators', 'type' => "text NULL", 'desc' => 'مؤشرات التحقق المقبلة'],
-        ['name' => 'monitoring_requirements', 'type' => "text NULL", 'desc' => 'متطلبات المراقبة'],
-        ['name' => 'escalation_probability', 'type' => "float DEFAULT 0", 'desc' => 'احتمالية التصعيد'],
-        ['name' => 'containment_probability', 'type' => "float DEFAULT 0", 'desc' => 'احتمالية الاحتواء'],
-        ['name' => 'spread_probability', 'type' => "float DEFAULT 0", 'desc' => 'احتمالية الانتشار الجغرافي'],
-        
-        // حقول الإنذار
+        // 13-15: حقول الإنذار والطبقات
         ['name' => 'alert_flag', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'علم الإنذار'],
-        ['name' => 'alert_type', 'type' => "varchar(100) DEFAULT ''", 'desc' => 'نوع الإنذار'],
-        ['name' => 'alert_reason', 'type' => "varchar(200) DEFAULT ''", 'desc' => 'سبب الإنذار'],
-        ['name' => 'alert_threshold', 'type' => "int(11) DEFAULT 0", 'desc' => 'عتبة الإنذار'],
         ['name' => 'alert_priority', 'type' => "varchar(50) DEFAULT 'عادي'", 'desc' => 'أولوية الإنذار'],
-        ['name' => 'alert_status', 'type' => "varchar(50) DEFAULT 'جديد'", 'desc' => 'حالة الإنذار'],
-        
-        // حقول إضافية للحرب المركبة
-        ['name' => 'warfare_layers', 'type' => "text NULL", 'desc' => 'طبقات الحرب المركبة النشطة'],
         ['name' => 'multi_domain_score', 'type' => "int(11) DEFAULT 0", 'desc' => 'درجة التعددية المجال'],
-        ['name' => 'strategic_impact', 'type' => "varchar(100) DEFAULT 'محلي'", 'desc' => 'الأثر الاستراتيجي'],
-        ['name' => 'asymmetric_indicator', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'مؤشر حرب غير متكافئة'],
-        ['name' => 'cognitive_warfare_flag', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'علم الحرب المعرفية'],
-        ['name' => 'information_operation', 'type' => "tinyint(1) DEFAULT 0", 'desc' => 'عملية معلوماتية'],
+        ['name' => 'hybrid_layers', 'type' => "text NULL", 'desc' => 'طبقات الحرب المركبة (JSON)'],
     ];
     
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -140,16 +57,19 @@ function sod_hybrid_warfare_add_advanced_fields() {
             $sql = "ALTER TABLE {$table} ADD COLUMN {$field['name']} {$field['type']}";
             $wpdb->query($sql);
             so_log("تم إضافة حقل OSINT المتقدم: {$field['name']} ({$field['desc']})", 'UPDATE');
+        } else {
+            so_log("الحقل موجود مسبقاً: {$field['name']}", 'SKIP');
         }
     }
     
-    // إضافة مفاتيح فهرسة لتحسين الأداء
+    // إنشاء مفاتيح الفهرسة الأساسية لتحسين الأداء
     $indexes = [
-        ['name' => 'idx_verification_status', 'sql' => "CREATE INDEX idx_verification_status ON {$table} (verification_status)"],
         ['name' => 'idx_threat_score', 'sql' => "CREATE INDEX idx_threat_score ON {$table} (threat_score)"],
-        ['name' => 'idx_alert_flag', 'sql' => "CREATE INDEX idx_alert_flag ON {$table} (alert_flag, alert_priority)"],
-        ['name' => 'idx_pattern_type', 'sql' => "CREATE INDEX idx_pattern_type ON {$table} (pattern_type)"],
-        ['name' => 'idx_hybrid_layers', 'sql' => "CREATE INDEX idx_hybrid_layers ON {$table} ((CAST(hybrid_layers AS CHAR(100)))"],
+        ['name' => 'idx_verification', 'sql' => "CREATE INDEX idx_verification ON {$table} (verification_status, confidence_score)"],
+        ['name' => 'idx_alert', 'sql' => "CREATE INDEX idx_alert ON {$table} (alert_flag, alert_priority, threat_score)"],
+        ['name' => 'idx_risk_level', 'sql' => "CREATE INDEX idx_risk_level ON {$table} (risk_level)"],
+        ['name' => 'idx_primary_actor', 'sql' => "CREATE INDEX idx_primary_actor ON {$table} (primary_actor)"],
+        ['name' => 'idx_geo_country', 'sql' => "CREATE INDEX idx_geo_country ON {$table} (geo_country)"],
     ];
     
     foreach ($indexes as $index) {
@@ -158,13 +78,19 @@ function sod_hybrid_warfare_add_advanced_fields() {
         );
         
         if (!$exists) {
-            // ملاحظة: بعض قواعد الفهرسة قد تحتاج تعديل حسب دعم MySQL
-            so_log("فهرس مقترح: {$index['name']}", 'INDEX');
+            try {
+                $wpdb->query($index['sql']);
+                so_log("تم إنشاء الفهرس: {$index['name']}", 'INDEX');
+            } catch (\Exception $e) {
+                so_log("فشل إنشاء الفهرس {$index['name']}: " . $e->getMessage(), 'ERROR');
+            }
+        } else {
+            so_log("الفهرس موجود مسبقاً: {$index['name']}", 'SKIP');
         }
     }
     
-    update_option('sod_hybrid_warfare_fields_version', '1.0.0');
-    so_log("تم تحديث قاعدة البيانات بحقول الحرب المركبة وOSINT المتقدم", 'COMPLETE');
+    update_option('sod_hybrid_warfare_fields_version', '2.0.0');
+    so_log("تم تحديث قاعدة البيانات بـ 15 حقل أساسي وفهارس محسنة", 'COMPLETE');
 }
 
 // ==========================================================================
@@ -653,7 +579,7 @@ function sod_activate_hybrid_warfare_update() {
 // تشغيل التحديث إذا لزم الأمر
 add_action('admin_init', function() {
     $current_version = get_option('sod_hybrid_warfare_fields_version', '0.0.0');
-    if (version_compare($current_version, '1.0.0', '<')) {
+    if (version_compare($current_version, '2.0.0', '<')) {
         sod_activate_hybrid_warfare_update();
     }
 });
