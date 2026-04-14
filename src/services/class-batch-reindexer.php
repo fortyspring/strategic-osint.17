@@ -14,6 +14,7 @@ namespace Beiruttime\OSINT\Services;
 use WordPress;
 use WP_Query;
 use WP_CLI;
+use Beiruttime\OSINT\Traits\Singleton;
 
 class Batch_Reindexer {
     
@@ -89,7 +90,7 @@ class Batch_Reindexer {
         
         if (!$use_legacy && class_exists('Beiruttime\OSINT\Services\HybridWarfareEngine')) {
             try {
-                $hybrid_engine = \Beiruttime\OSINT\Services\HybridWarfareEngine::instance();
+                $hybrid_engine = \Beiruttime\OSINT\Services\HybridWarfareEngine::getInstance();
             } catch (\Exception $e) {
                 error_log("Beiruttime OSINT: Failed to init HybridWarfareEngine: " . $e->getMessage());
                 $use_legacy = true;
