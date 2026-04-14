@@ -2,48 +2,26 @@
 # Compiled and build artifacts
 *.pyc
 __pycache__/
-*.o
-*.obj
-*.class
-*.exe
-*.dll
-*.so
-*.a
-*.out
 
 # Dependencies
 vendor/
-node_modules/
-.venv/
-venv/
-.env
-.env.local
-*.env.*
+composer.lock
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
-*.swo
+
+# Environment
+.env
+.env.local
+*.env.*
 
 # Editors
 .vscode/
 .idea/
 
-# System files
-.DS_Store
-Thumbs.db
-
-# Build and distribution
-dist/
-build/
-target/
-coverage/
-htmlcov/
-.coverage
-
-# Caches
-.mypy_cache/
-.pytest_cache/
-.gradle/
+# Backup and swap files
+*.bak
+*.swp
+*~
 ```

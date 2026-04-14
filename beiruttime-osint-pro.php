@@ -14,40 +14,8 @@
 
 if (!defined('ABSPATH')) exit;
 
-// تحميل وحدات الأمان والتنظيف
-require_once __DIR__ . '/includes/security/class-security-fixes.php';
-require_once __DIR__ . '/includes/security/class-sanitization-utils.php';
-require_once __DIR__ . '/includes/security/class-input-validator.php';
-require_once __DIR__ . '/includes/security/class-file-upload-security.php';
-require_once __DIR__ . '/includes/security/class-security-loader.php';
-
-// تهيئة نظام الأمان بعد تحميل جميع الملفات
-osint_initialize_security();
-
-$sod_inc_base = __DIR__ . '/includes';
-if (is_dir($sod_inc_base)) {
-    require_once $sod_inc_base . '/classifier-service.php';
-    require_once $sod_inc_base . '/newslog-service.php';
-}
-
-// تحميل السمات المساعدة (Traits)
-require_once __DIR__ . '/src/traits/trait-singleton.php';
-require_once __DIR__ . '/src/traits/trait-loggable.php';
-
-// تحميل ملفات الحرب المركبة والتكامل
-require_once __DIR__ . '/osint-hybrid-warfare-update.php';
-require_once $sod_inc_base . '/class-hybrid-warfare-integrator.php';
-require_once $sod_inc_base . '/class-entity-relations-manager.php';
-
-// تحميل محركات الخدمات الحديثة
-require_once __DIR__ . '/src/services/class-hybrid-warfare.php';
-require_once __DIR__ . '/src/services/class-verification.php';
-require_once __DIR__ . '/src/services/class-early-warning.php';
-require_once __DIR__ . '/src/services/class-batch-reindexer.php';
-
-// تحميل مكونات النظام الجديدة (رادار التهديد، التقارير، الفلتر الذكي)
-require_once __DIR__ . '/osint-threat-radar.php';
-require_once __DIR__ . '/osint-executive-reports.php';
+// تحميل ملف bootstrap الرئيسي الذي يقوم بتحميل جميع المكونات
+require_once __DIR__ . '/src/bootstrap.php';
 require_once __DIR__ . '/class-smart-gatekeeper.php';
 
 
