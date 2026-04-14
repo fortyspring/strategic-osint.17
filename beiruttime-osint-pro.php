@@ -4234,7 +4234,25 @@ function sod_get_region_hierarchy(): array {
 
 function sod_build_analytics(array $events): array {
     if (empty($events)) return sod_empty_analytics();
+    
+    // تهيئة المتغيرات الأساسية
     $total=0;$total_score=0;$critical=0;$regions=[];$actors=[];$intel_types=[];$levels=[];$hourly=[];$truth_layers=['field_action'=>0,'statement'=>0,'report'=>0,'defensive_alert'=>0,'rumor'=>0,'general'=>0];$war_directions=['escalating'=>0,'de-escalating'=>0,'aftermath'=>0,'stable_or_unclear'=>0];$max_score=0;$hot_region='';$region_scores=[];
+    
+    // تهيئة متغيرات الحرب المركبة والتحقق وشبكة الفاعلين
+    $hybrid_layers_count = [
+        'military' => 0, 'security' => 0, 'cyber' => 0, 'political' => 0,
+        'economic' => 0, 'social' => 0, 'media_psychological' => 0,
+        'energy' => 0, 'geostrategic' => 0
+    ];
+    $hybrid_combinations = [];
+    $verification_stats = ['verified'=>0, 'partial'=>0, 'unverified'=>0, 'avg_confidence'=>0];
+    $confidence_sum = 0;
+    $early_warnings = [];
+    $actor_networks = [];
+    $target_map = [];
+    $sponsor_map = [];
+    $relationship_types = [];
+    
     foreach ($events as $ev) {
         $score=(int)($ev['score']??0);$region=sanitize_text_field((string)($ev['region']??'غير محدد'));$actor=sanitize_text_field((string)($ev['actor_v2']??'غير محدد'));$intel=sanitize_text_field((string)($ev['intel_type']??'غير محدد'));$level=sanitize_text_field((string)($ev['tactical_level']??'تكتيكي'));$ts=(int)($ev['event_timestamp']??0);
         $total++;$total_score+=$score;if($score>=140)$critical++;
@@ -4243,12 +4261,122 @@ function sod_build_analytics(array $events): array {
         $hour_key=gmdate('Y-m-d H:00',$ts);$hourly[$hour_key]=($hourly[$hour_key]??0)+1;
         $fd=json_decode((string)($ev['field_data']??'{}'),true)?:[];$tl=(string)($fd['truth_layer']??'general');if(isset($truth_layers[$tl]))$truth_layers[$tl]++;
         $wd=json_decode((string)($ev['war_data']??'{}'),true)?:[];$wd_ctx=$wd['contextual_war_engine']??[];$wd_dir=(string)($wd_ctx['war_direction']??'stable_or_unclear');if(isset($war_directions[$wd_dir]))$war_directions[$wd_dir]++;
+        
+        // تحليل طبقات الحرب المركبة من field_data
+        $layers = $fd["hybrid_layers"] ?? [];
+        if (!empty($layers) && is_array($layers)) {
+            foreach ($layers as $layer) {
+                $layer_key = is_array($layer) ? ($layer["layer"] ?? (is_string($layer) ? $layer : "")) : $layer;
+                if ($layer_key && isset($hybrid_layers_count[$layer_key])) {
+                    $hybrid_layers_count[$layer_key]++;
+                }
+            }
+            // رصد التوليفات الخطرة
+            if (count($layers) >= 2) {
+                $combo_key = implode("+", array_slice($layers, 0, 2));
+                $hybrid_combinations[$combo_key] = ($hybrid_combinations[$combo_key] ?? 0) + 1;
+            }
+        }
+        
+        // إحصائيات التحقق
+        $vdata = $fd["verification"] ?? [];
+        $vstatus = $vdata["status"] ?? "";
+        if ($vstatus === "verified" || $vstatus === "confirmed") {
+            $verification_stats["verified"]++;
+        } elseif ($vstatus === "partial" || $vstatus === "likely") {
+            $verification_stats["partial"]++;
+        } else {
+            $verification_stats["unverified"]++;
+        }
+        $conf = (float)($fd["confidence_score"] ?? $vdata["confidence"] ?? 0);
+        $confidence_sum += $conf;
+        
+        // تجميع شبكة الفاعلين من multi_actor
+        $ma = $fd['multi_actor'] ?? [];
+        if (!empty($ma["network"]) && is_array($ma["network"])) {
+            foreach ($ma["network"] as $net_item) {
+                $actor_name = is_array($net_item) ? ($net_item["actor"] ?? "") : $net_item;
+                $role = is_array($net_item) ? ($net_item["role"] ?? "participant") : "participant";
+                if ($actor_name) {
+                    $actor_networks[$actor_name] = ($actor_networks[$actor_name] ?? 0) + 1;
+                    // تتبع الأدوار
+                    if (isset($relationship_types[$role])) {
+                        $relationship_types[$role]++;
+                    } else {
+                        $relationship_types[$role] = 1;
+                    }
+                }
+            }
+        }
+        // تتبع الأهداف والجهات الراعية
+        $target = trim((string)($ma['target'] ?? ''));
+        if ($target !== '') $target_map[$target] = ($target_map[$target] ?? 0) + 1;
+        $sponsor = trim((string)($ma['sponsor'] ?? ''));
+        if ($sponsor !== '') $sponsor_map[$sponsor] = ($sponsor_map[$sponsor] ?? 0) + 1;
     }
+    
+    // حساب متوسط الثقة
+    $verification_stats["avg_confidence"] = $total > 0 ? round($confidence_sum / $total, 2) : 0;
+    
+    // توليد تحذيرات مبكرة بناءً على الأنماط
+    arsort($hybrid_layers_count);
+    arsort($hybrid_combinations);
+    $top_combos = array_slice($hybrid_combinations, 0, 3, true);
+    
+    if (!empty($top_combos)) {
+        foreach ($top_combos as $combo => $count) {
+            if ($count >= 3) {
+                $early_warnings[] = [
+                    "type" => "hybrid_combo",
+                    "level" => $count >= 5 ? "critical" : "high",
+                    "message" => "توليفة مركبة متكررة: {$combo} ({$count} مرات)",
+                    "recommendation" => "مراقبة التصعيد متعدد الأبعاد"
+                ];
+            }
+        }
+    }
+    
+    if ($verification_stats["avg_confidence"] < 0.5 && $total > 10) {
+        $early_warnings[] = [
+            "type" => "low_confidence",
+            "level" => "medium",
+            "message" => "متوسط الثقة منخفض: {$verification_stats["avg_confidence"]}",
+            "recommendation" => "تشديد التحقق قبل الاستنتاج"
+        ];
+    }
+    
     $avg_score=$total>0?round($total_score/$total):0;arsort($actors);arsort($region_scores);arsort($intel_types);ksort($hourly);
     $escalation_index=sod_calc_escalation_index($truth_layers,$war_directions,$critical,$total);
     $deception_index=$total>0?round(($truth_layers['statement']/$total)*100):0;
     $gci=sod_calc_gci($region_scores,$critical,$total_score);
-    return ['total'=>$total,'critical'=>$critical,'avg_score'=>$avg_score,'total_score'=>$total_score,'hot_region'=>$hot_region,'regions'=>$regions,'region_scores'=>$region_scores,'actors'=>$actors,'intel_types'=>$intel_types,'levels'=>$levels,'hourly'=>$hourly,'truth_layers'=>$truth_layers,'war_directions'=>$war_directions,'escalation_index'=>$escalation_index,'deception_index'=>$deception_index,'gci'=>$gci];
+    
+    return [
+        'total'=>$total,
+        'critical'=>$critical,
+        'avg_score'=>$avg_score,
+        'total_score'=>$total_score,
+        'hot_region'=>$hot_region,
+        'regions'=>$regions,
+        'region_scores'=>$region_scores,
+        'actors'=>$actors,
+        'intel_types'=>$intel_types,
+        'levels'=>$levels,
+        'hourly'=>$hourly,
+        'truth_layers'=>$truth_layers,
+        'war_directions'=>$war_directions,
+        'escalation_index'=>$escalation_index,
+        'deception_index'=>$deception_index,
+        'gci'=>$gci,
+        // بيانات الحرب المركبة المضافة حديثاً
+        'hybrid_layers_count' => $hybrid_layers_count,
+        'hybrid_combinations' => $hybrid_combinations,
+        'verification_stats' => $verification_stats,
+        'early_warnings' => $early_warnings,
+        'actor_networks' => $actor_networks,
+        'target_map' => $target_map,
+        'sponsor_map' => $sponsor_map,
+        'relationship_types' => $relationship_types
+    ];
 }
 
 function sod_calc_escalation_index(array $truth, array $dirs, int $critical, int $total): int {
