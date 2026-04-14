@@ -14,6 +14,9 @@
 
 if (!defined('ABSPATH')) exit;
 
+// تحميل وحدات الأمان والتنظيف
+require_once __DIR__ . '/includes/security/class-security-loader.php';
+
 $sod_inc_base = __DIR__ . '/includes';
 if (is_dir($sod_inc_base)) {
     require_once $sod_inc_base . '/classifier-service.php';
