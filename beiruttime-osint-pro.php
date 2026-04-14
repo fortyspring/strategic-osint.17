@@ -9691,26 +9691,28 @@ class SO_Admin_UI {
         if (isset($_POST['so_import_settings']) && check_admin_referer('so_import_settings_nonce')) {
             $errors = [];
             $file = $_FILES['so_settings_file'] ?? null;
-            if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-                $errors[] = 'خطأ في رفع الملف.';
+            
+            // استخدام نظام أمان رفع الملفات الجديد
+            $validation_result = OSINT_File_Upload_Security::validate_uploaded_file($file, 'settings');
+            
+            if (is_wp_error($validation_result)) {
+                $errors[] = $validation_result->get_error_message();
             } else {
-                $raw = file_get_contents($file['tmp_name']); // phpcs:ignore WordPress.WP.AlternativeFunctions
-                $decoded = json_decode($raw, true);
-                if (!is_array($decoded) || !isset($decoded['_plugin'])) {
-                    $errors[] = 'الملف غير صالح — يرجى استخدام ملف JSON من هذه الإضافة فقط.';
+                // معالجة الاستيراد بشكل آمن
+                $import_result = OSINT_File_Upload_Security::import_settings($validation_result);
+                
+                if (is_wp_error($import_result)) {
+                    $errors[] = $import_result->get_error_message();
                 } else {
-                    $allowed = array_keys(self::get_all_plugin_options());
-                    $restored = 0;
-                    foreach ($decoded as $key => $value) {
-                        if ($key === '_plugin' || $key === '_exported_at') continue;
-                        if (in_array($key, $allowed, true)) {
-                            update_option($key, $value);
-                            $restored++;
-                        }
-                    }
-                    wp_safe_redirect(add_query_arg(['saved'=>'1','restored'=>$restored], admin_url('admin.php?page=strategic-osint-io'))); exit;
+                    wp_safe_redirect(add_query_arg([
+                        'saved' => '1',
+                        'restored' => $import_result['restored'],
+                        'skipped' => $import_result['skipped']
+                    ], admin_url('admin.php?page=strategic-osint-io'))); 
+                    exit;
                 }
             }
+            
             if (!empty($errors)) {
                 wp_safe_redirect(add_query_arg(['io_error'=>rawurlencode(implode(' | ', $errors))], admin_url('admin.php?page=strategic-osint-io'))); exit;
             }
@@ -9746,42 +9748,34 @@ class SO_Admin_UI {
 
         // ── IMPORT ENTITY BANKS (CSV) ─────────────────────────────────────────
         if (isset($_POST['so_import_banks']) && check_admin_referer('so_import_banks_nonce')) {
-            global $wpdb;
             $file = $_FILES['so_banks_file'] ?? null;
-            if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-                wp_safe_redirect(add_query_arg(['io_error'=>rawurlencode('خطأ في رفع الملف.')], admin_url('admin.php?page=strategic-osint-io'))); exit;
+            
+            // استخدام نظام أمان رفع الملفات الجديد
+            $validation_result = OSINT_File_Upload_Security::validate_uploaded_file($file, 'csv');
+            
+            if (is_wp_error($validation_result)) {
+                wp_safe_redirect(add_query_arg([
+                    'io_error' => rawurlencode($validation_result->get_error_message())
+                ], admin_url('admin.php?page=strategic-osint-io'))); 
+                exit;
             }
-            $handle = fopen($file['tmp_name'], 'r'); // phpcs:ignore WordPress.WP.AlternativeFunctions
-            if (!$handle) {
-                wp_safe_redirect(add_query_arg(['io_error'=>rawurlencode('تعذّر قراءة الملف.')], admin_url('admin.php?page=strategic-osint-io'))); exit;
+            
+            // معالجة استيراد CSV بشكل آمن
+            $import_result = OSINT_File_Upload_Security::import_banks_csv($validation_result);
+            
+            if (is_wp_error($import_result)) {
+                wp_safe_redirect(add_query_arg([
+                    'io_error' => rawurlencode($import_result->get_error_message())
+                ], admin_url('admin.php?page=strategic-osint-io'))); 
+                exit;
             }
-            // Strip BOM
-            $bom = fread($handle, 3); // phpcs:ignore WordPress.WP.AlternativeFunctions
-            if ($bom !== "\xEF\xBB\xBF") rewind($handle);
-            $header = fgetcsv($handle); // skip header row
-            $imported = 0; $skipped = 0;
-            $valid_banks = ['people','places','weapons','operations'];
-            while (($cols = fgetcsv($handle)) !== false) {
-                if (count($cols) < 3) { $skipped++; continue; }
-                $bank  = sanitize_key(trim($cols[0]));
-                $name  = sanitize_text_field(trim($cols[1]));
-                $affil = sanitize_text_field(trim($cols[2]));
-                $notes = sanitize_text_field(trim($cols[3] ?? ''));
-                $weight = isset($cols[4]) ? abs((float)$cols[4]) : 5.0;
-                if (!in_array($bank, $valid_banks, true) || empty($name)) { $skipped++; continue; }
-                $key = $bank.':'.$name;
-                $hash = md5($key);
-                $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}so_entity_graph WHERE edge_hash=%s", $hash));
-                if ($exists) {
-                    $wpdb->update("{$wpdb->prefix}so_entity_graph", ['target_name'=>$affil,'region'=>$notes,'weight'=>$weight,'last_seen'=>time()], ['edge_hash'=>$hash]);
-                } else {
-                    $ts = time();
-                    $wpdb->insert("{$wpdb->prefix}so_entity_graph", ['edge_hash'=>$hash,'actor_name'=>$key,'target_name'=>$affil,'region'=>$notes,'weight'=>$weight,'event_count'=>0,'first_seen'=>$ts,'last_seen'=>$ts]);
-                }
-                $imported++;
-            }
-            fclose($handle); // phpcs:ignore WordPress.WP.AlternativeFunctions
-            wp_safe_redirect(add_query_arg(['saved'=>'1','banks_imported'=>$imported,'banks_skipped'=>$skipped], admin_url('admin.php?page=strategic-osint-io'))); exit;
+            
+            wp_safe_redirect(add_query_arg([
+                'saved' => '1',
+                'banks_imported' => $import_result['imported'],
+                'banks_skipped' => $import_result['skipped']
+            ], admin_url('admin.php?page=strategic-osint-io'))); 
+            exit;
         }
 
         // ── RESEED ENTITY BANKS ───────────────────────────────────────────────

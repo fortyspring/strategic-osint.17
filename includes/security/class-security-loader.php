@@ -25,6 +25,9 @@ function osint_load_security_modules() {
     
     // تحميل مدقق المدخلات
     require_once $security_dir . '/class-input-validator.php';
+    
+    // تحميل أمان رفع الملفات
+    require_once $security_dir . '/class-file-upload-security.php';
 }
 
 /**
