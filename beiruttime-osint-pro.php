@@ -3994,7 +3994,7 @@ class SO_Alert_Dispatcher {
         global $wpdb;
         $wpdb->replace("{$wpdb->prefix}so_sent_alerts", ['news_hash'=>$hash,'source_name'=>$source,'sent_time'=>current_time('mysql')]);
     }
-    public static function send_telegram($item) {
+    public static function send_telegram($item, $template_fields = []) {
         $token = trim(get_option('so_tg_token', '')); if (empty($token)) return false;
         $chats = array_filter(array_map('trim', explode(',', get_option('so_tg_chat', '')))); if (empty($chats)) return false;
 
@@ -4011,20 +4011,30 @@ class SO_Alert_Dispatcher {
         }
 
         // ── إعدادات الحقول الظاهرة ──────────────────────────────────────────
-        $tpl = json_decode((string)get_option('so_tg_template_fields', '{}'), true) ?: [];
+        // استخدام القالب الممرر أو القالب المحفوظ
+        $tpl = !empty($template_fields) ? $template_fields : json_decode((string)get_option('so_tg_template_fields', '{}'), true) ?: [];
         $show = function($key) use ($tpl) { return isset($tpl[$key]) ? (bool)$tpl[$key] : true; };
 
         $wd = json_decode((string)($item['war_data']??'{}'), true) ?: [];
         $score_ar = number_format((int)($item['score']??0));
+
+        // حقول الحرب المركبة
+        $hybrid_layers = !empty($item['hybrid_layers']) ? json_decode($item['hybrid_layers'], true) : [];
+        $osint_type = sanitize_text_field($item['osint_type'] ?? '');
+        $threat_score = (int)($item['threat_score'] ?? 0);
+        $risk_level = sanitize_text_field($item['risk_level'] ?? '');
+        $primary_actor = sanitize_text_field($item['primary_actor'] ?? '');
 
         // ── بناء رسالة تيليغرام ─────────────────────────────────────────────
         $header_custom = trim((string)get_option('so_tg_header_text', ''));
         $header = $header_custom !== '' ? $header_custom : '🚨 <b>تنبيه استخباراتي | Beiruttime OSINT</b>';
         $text = $header . "\n";
         $text .= '<b>' . htmlspecialchars(so_limit_text($item['title']??'', 900), ENT_QUOTES, 'UTF-8') . "</b>\n\n";
-        $text .= "📰 <b>المصدر:</b> " . esc_html($item['source_name']??'مجهول') . "\n";
+        
+        if ($show('source')) $text .= "📰 <b>المصدر:</b> " . esc_html($item['source_name']??'مجهول') . "\n";
         if ($show('classification')) $text .= "📌 <b>التصنيف:</b> " . esc_html($item['intel_type']??'غير محدد') . "\n";
         if ($show('level'))          $text .= "🎯 <b>المستوى:</b> " . esc_html($item['tactical_level']??'تكتيكي') . "\n";
+        
         if ($show('actor')) {
             $actor_val = trim((string)($item['actor_v2']??''));
             $unknown_actors = ['عام/مجهول','غير محدد','مجهول',''];
@@ -4045,14 +4055,42 @@ class SO_Alert_Dispatcher {
                 $text .= "🕳️ <b>حالة الإسناد:</b> " . so_attribution_label($status) . "\n";
             }
         }
+        
         if ($show('region'))         $text .= "📍 <b>المنطقة:</b> " . esc_html($item['region']??'غير محدد') . "\n";
         if ($show('score'))          $text .= "⚠️ <b>مؤشر الخطورة:</b> {$score_ar} نقطة\n";
+        
+        // حقول الحرب المركبة الجديدة
+        if ($show('threat_score') && $threat_score > 0) {
+            $text .= "🔥 <b>درجة التهديد:</b> {$threat_score}/100\n";
+        }
+        if ($show('risk_level') && !empty($risk_level)) {
+            $text .= "⚡ <b>مستوى الخطر:</b> {$risk_level}\n";
+        }
+        if ($show('osint_type') && !empty($osint_type)) {
+            $layer_name = SO_Alert_Dispatcher::get_osint_type_name($osint_type);
+            $text .= "🏷️ <b>نوع OSINT:</b> {$layer_name}\n";
+        }
+        if ($show('hybrid_layers') && !empty($hybrid_layers) && is_array($hybrid_layers)) {
+            $layers_ar = [];
+            foreach (array_keys($hybrid_layers) as $layer_key) {
+                $layers_ar[] = SO_Alert_Dispatcher::get_osint_type_name($layer_key);
+            }
+            if (!empty($layers_ar)) {
+                $text .= "🎯 <b>طبقات الحرب المركبة:</b> " . implode(' • ', $layers_ar) . "\n";
+            }
+        }
+        if ($show('primary_actor') && !empty($primary_actor)) {
+            $text .= "👤 <b>الفاعل الرئيسي:</b> " . esc_html($primary_actor) . "\n";
+        }
+        
         if ($show('weapon') && !empty($wd['weapon_means']) && $wd['weapon_means'] !== 'غير محدد') $text .= "⚙️ <b>الوسيلة:</b> " . esc_html($wd['weapon_means']) . "\n";
         if ($show('target') && !empty($wd['target']) && $wd['target'] !== 'غير محدد') $text .= "🎯 <b>الهدف:</b> " . esc_html($wd['target']) . "\n";
         if ($show('verified') && !empty($item['llm_verified']) && (int)$item['llm_verified'] === 1) $text .= "🤖 <b>تم التحقق بالذكاء الاصطناعي</b>\n";
         if ($show('link')) $text .= "\n🔗 <a href='" . esc_url(so_normalize_event_link($item['link']??'')) . "'>رابط المصدر</a>";
+        
         // وسم تجاوز عتبة الشهداء
         if (!empty($item['_martyrdom_bypass'])) $text .= "\n<i>📌 إرسال تلقائي — رسالة شهداء/ضحايا</i>";
+        
         // ── التذييل ─────────────────────────────────────────────────────────
         $tg_link  = trim((string)get_option('so_tg_channel_link',''));
         $wa_link  = trim((string)get_option('so_tg_wa_channel',''));
@@ -4064,6 +4102,7 @@ class SO_Alert_Dispatcher {
         if (!empty($footer_parts)) {
             $text .= "\n\n" . str_repeat('—', 20) . "\n" . implode("  |  ", $footer_parts);
         }
+        
         // ── إرسال الصورة إن وُجدت (sendPhoto بدل sendMessage) ───────────────
         $image_url = trim((string)($item['image_url']??''));
         // أولوية: صورة قناة تلغرام الخاصة إن كانت من رابط t.me

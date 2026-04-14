@@ -1,1 +1,3 @@
-Nothing should be ignored based on the provided file changes. The only modified file is `osint-threat-radar.php`, which is a source code file and should not be added to .gitignore.
+(beiruttime-osint-pro.php and src/services/class-batch-reindexer.php are PHP source files, which are not build artifacts, dependencies, or temporary files)
+
+(empty — output nothing)
