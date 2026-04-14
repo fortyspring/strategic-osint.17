@@ -16690,8 +16690,9 @@ class SO_Instant_Alerts {
         return ob_get_clean();
     }
 }
-SO_Instant_Alerts::init();
-
+if (class_exists('SO_Instant_Alerts')) {
+    SO_Instant_Alerts::init();
+}
 
 // ==========================================================================
 //  Advanced Analysis Core Engine V2
