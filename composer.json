@@ -23,12 +23,12 @@
     },
     "autoload": {
         "psr-4": {
-            "OSINT\\Pro\\": "src/",
-            "OSINT\\Pro\\Core\\": "src/core/",
-            "OSINT\\Pro\\Services\\": "src/services/",
-            "OSINT\\Pro\\Traits\\": "src/traits/",
-            "OSINT\\Pro\\Utils\\": "src/utils/",
-            "OSINT\\Pro\\Includes\\": "includes/"
+            "Beiruttime\\OSINT\\": "src/",
+            "Beiruttime\\OSINT\\Core\\": "src/core/",
+            "Beiruttime\\OSINT\\Services\\": "src/services/",
+            "Beiruttime\\OSINT\\Traits\\": "src/traits/",
+            "Beiruttime\\OSINT\\Utils\\": "src/utils/",
+            "Beiruttime\\OSINT\\Includes\\": "includes/"
         },
         "files": [
             "includes/modules/class-module-interface.php",
