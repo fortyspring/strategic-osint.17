@@ -74,17 +74,32 @@ class Batch_Reindexer {
             return ['status' => 'completed', 'message' => 'لا توجد أحداث للمعالجة', 'stats' => $this->stats];
         }
 
-        // تحميل محركات التحليل إذا لم تكن محملة
+        // تحميل محركات التحليل مع معالجة الأخطاء
+        $use_legacy = false;
+        $hybrid_engine = null;
+        
         if (!class_exists('Beiruttime\OSINT\Services\HybridWarfareEngine')) {
-            require_once __DIR__ . '/class-hybrid-warfare.php';
+            $hybrid_file = __DIR__ . '/class-hybrid-warfare.php';
+            if (file_exists($hybrid_file)) {
+                require_once $hybrid_file;
+            } else {
+                $use_legacy = true;
+            }
         }
         
-        $hybrid_engine = \Beiruttime\OSINT\Services\HybridWarfareEngine::instance();
+        if (!$use_legacy && class_exists('Beiruttime\OSINT\Services\HybridWarfareEngine')) {
+            try {
+                $hybrid_engine = \Beiruttime\OSINT\Services\HybridWarfareEngine::instance();
+            } catch (\Exception $e) {
+                error_log("Beiruttime OSINT: Failed to init HybridWarfareEngine: " . $e->getMessage());
+                $use_legacy = true;
+            }
+        }
 
         foreach ($events as $event) {
             try {
                 $this->stats['processed']++;
-                
+
                 // تحضير البيانات للتحليل
                 $event_data = [
                     'title' => $event['title'],
@@ -94,20 +109,30 @@ class Batch_Reindexer {
                     'score' => $event['score']
                 ];
 
+                $layers_json = '';
+                $primary_layer = '';
+                $multi_domain = 0;
+
+                // 1. محاولة استخدام المحرك الجديد
                 if (!$use_legacy && $hybrid_engine) {
-                    // 1. تحليل طبقات الحرب المركبة باستخدام المحرك الجديد
-                    $hybrid_analysis = $hybrid_engine->analyzeLayers($event_data);
-                    
-                    // تحويل النتيجة إلى صيغة قاعدة البيانات
-                    $layers_json = !empty($hybrid_analysis['layers']) ? json_encode($hybrid_analysis['layers'], JSON_UNESCAPED_UNICODE) : '';
-                    $primary_layer = $hybrid_analysis['primary_layer'] ?? '';
-                    $multi_domain = round($hybrid_analysis['composite_score'] ?? 0, 3);
-                } else {
-                    // استخدام الدوال القديمة كبديل
+                    try {
+                        $hybrid_analysis = $hybrid_engine->analyzeLayers($event_data);
+                        $layers_json = !empty($hybrid_analysis['layers']) ? json_encode($hybrid_analysis['layers'], JSON_UNESCAPED_UNICODE) : '';
+                        $primary_layer = $hybrid_analysis['primary_layer'] ?? '';
+                        $multi_domain = round($hybrid_analysis['composite_score'] ?? 0, 3);
+                    } catch (\Exception $e) {
+                        error_log("Beiruttime OSINT: Hybrid engine failed for event {$event['id']}: " . $e->getMessage());
+                        $use_legacy = true;
+                    }
+                }
+                
+                // 2. إذا فشل المحرك أو كانت النتيجة فارغة، نستخدم Legacy
+                if ($use_legacy || empty($layers_json)) {
                     $layers_json = $this->legacy_classify_hybrid_layers($event_data);
                     $primary_layer = $this->legacy_get_primary_layer($layers_json);
                     $multi_domain = $this->legacy_calculate_multi_domain($layers_json);
                 }
+
                 
                 // 2. حساب Scores المتقدم
                 $scores = $this->calculate_scores($event_data, $layers_json);
@@ -298,6 +323,38 @@ class Batch_Reindexer {
         $layers = json_decode($layers_json, true);
         if (empty($layers)) return 0;
         return round(min(1.0, count($layers) * 0.15), 3);
+    }
+
+    /**
+     * استخراج شبكة الفاعلين من النص
+     */
+    private function extract_actor_network($event_data) {
+        $text = ($event_data['title'] ?? '') . ' ' . ($event_data['war_data'] ?? '');
+        $primary_actor = $event_data['actor_v2'] ?? '';
+        
+        // إذا كان الفاعل موجوداً مسبقاً نستخدمه
+        if (!empty($primary_actor)) {
+            return [
+                'primary_actor' => $primary_actor,
+                'actor_network' => json_encode(['primary' => $primary_actor], JSON_UNESCAPED_UNICODE)
+            ];
+        }
+        
+        // محاولة استخراج الفاعل من النص باستخدام كلمات مفتاحية بسيطة
+        $actor_keywords = ['إسرائيلية', 'إسرائيلي', 'حزب الله', 'أمريكية', 'أمريكي', 'سورية', 'سوري', 'لبنانية', 'لبناني'];
+        $detected_actor = '';
+        
+        foreach ($actor_keywords as $keyword) {
+            if (mb_stripos($text, $keyword) !== false) {
+                $detected_actor = $keyword;
+                break;
+            }
+        }
+        
+        return [
+            'primary_actor' => $detected_actor,
+            'actor_network' => !empty($detected_actor) ? json_encode(['primary' => $detected_actor], JSON_UNESCAPED_UNICODE) : null
+        ];
     }
 
     /**
