@@ -33,6 +33,12 @@ require_once $sod_inc_base . '/class-entity-relations-manager.php';
 require_once __DIR__ . '/src/services/class-hybrid-warfare.php';
 require_once __DIR__ . '/src/services/class-verification.php';
 require_once __DIR__ . '/src/services/class-early-warning.php';
+require_once __DIR__ . '/src/services/class-batch-reindexer.php';
+
+// تحميل مكونات النظام الجديدة (رادار التهديد، التقارير، الفلتر الذكي)
+require_once __DIR__ . '/osint-threat-radar.php';
+require_once __DIR__ . '/osint-executive-reports.php';
+require_once __DIR__ . '/class-smart-gatekeeper.php';
 
 
 function sod_has_arabic_chars(string $text): bool {
@@ -3019,7 +3025,7 @@ class SO_DB_Manager {
         if (!get_option('so_last_sync_summary')) update_option('so_last_sync_summary', [], false);
         // قالب تيليغرام
         if (get_option('so_tg_template_fields', null) === null) {
-            $default_tpl = ['classification'=>true,'level'=>true,'actor'=>true,'region'=>true,'score'=>true,'weapon'=>true,'target'=>true,'verified'=>true,'link'=>true,'image'=>true];
+            $default_tpl = ['classification'=>true,'level'=>true,'actor'=>true,'region'=>true,'score'=>true,'weapon'=>true,'target'=>true,'verified'=>true,'link'=>true,'image'=>true,'threat_score'=>true,'risk_level'=>true,'osint_type'=>true,'hybrid_layers'=>true,'primary_actor'=>true];
             update_option('so_tg_template_fields', wp_json_encode($default_tpl), false);
         }
         if (get_option('so_tg_min_score', null) === null) update_option('so_tg_min_score', 0, false);
@@ -9428,7 +9434,7 @@ class SO_Admin_UI {
             foreach ($opts2 as $opt) if (isset($_POST[$opt])) update_option($opt, sanitize_text_field(wp_unslash($_POST[$opt])));
             update_option('so_telegram_enabled', isset($_POST['so_telegram_enabled']) ? 1 : 0);
             // ── قالب تيليغرام ────────────────────────────────────────────────
-            $all_tpl_keys = ['classification','level','actor','region','score','weapon','target','verified','link','image'];
+            $all_tpl_keys = ['classification','level','actor','region','score','weapon','target','verified','link','image','threat_score','risk_level','osint_type','hybrid_layers','primary_actor'];
             $checked_keys = array_map('sanitize_text_field', (array)($_POST['so_tg_tpl_fields'] ?? []));
             $tpl_data = [];
             foreach ($all_tpl_keys as $k) $tpl_data[$k] = in_array($k, $checked_keys, true);
@@ -10150,6 +10156,11 @@ class SO_Admin_UI {
                 'verified'       => 'تم التحقق بالذكاء الاصطناعي 🤖',
                 'link'           => 'رابط المصدر 🔗',
                 'image'          => 'إرسال صورة الخبر (sendPhoto) 🖼️',
+                'threat_score'   => 'درجة التهديد 🔥',
+                'risk_level'     => 'مستوى الخطر ⚡',
+                'osint_type'     => 'نوع OSINT 🧩',
+                'hybrid_layers'  => 'طبقات الحرب المركبة 🎯',
+                'primary_actor'  => 'الفاعل الرئيسي 👤',
             ];
             ?>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px;">
