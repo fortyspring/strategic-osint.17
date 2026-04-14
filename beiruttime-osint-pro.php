@@ -17315,7 +17315,6 @@ add_shortcode('osint_threat_ai', function(){
     <?php return ob_get_clean();
 });
 
-
 if (!function_exists('so_ma_admin_footer_panel')) {
 function so_ma_admin_footer_panel() {
     if (!is_admin()) return;
@@ -17349,3 +17348,5 @@ function so_ma_admin_footer_panel() {
     </script>';
 }
 add_action('admin_footer', 'so_ma_admin_footer_panel', 99);
+
+// End of file marker
