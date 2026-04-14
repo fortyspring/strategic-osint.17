@@ -58,7 +58,67 @@ function osint_initialize_security() {
     add_action('init', 'osint_run_security_maintenance');
     
     // تسجيل أحداث الأمان عند تفعيل الإضافة
-    register_activation_hook(__DIR__ . '/../../beiruttime-osint-pro.php', 'osint_setup_security_logging');
+    // ملاحظة: سيتم استدعاؤها من الملف الرئيسي
+    // register_activation_hook(__DIR__ . '/../../beiruttime-osint-pro.php', 'osint_setup_security_logging');
+    
+    // إضافة إجراءات AJAX الآمنة
+    add_action('wp_ajax_osint_verify_security', function() {
+        osint_verify_ajax_request('osint_security_check', true, 'read');
+        wp_send_json_success([
+            'status' => 'secure',
+            'timestamp' => current_time('mysql'),
+            'ip' => osint_get_client_ip(),
+        ]);
+    });
+    
+    // تسجيل حدث عند تسجيل الدخول الفاشل
+    add_action('wp_login_failed', function($username) {
+        $ip = osint_get_client_ip();
+        
+        // تسجيل الحدث
+        osint_log_security_event(
+            'login_failed',
+            sprintf('محاولة دخول فاشلة للمستخدم: %s', $username),
+            ['username' => $username, 'ip' => $ip]
+        );
+        
+        // تتبع المحاولات
+        $failed_attempts = get_option('osint_failed_login_attempts', []);
+        if (!is_array($failed_attempts)) {
+            $failed_attempts = [];
+        }
+        
+        $failed_attempts[] = [
+            'username' => $username,
+            'ip' => $ip,
+            'timestamp' => time(),
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+        ];
+        
+        // الاحتفاظ بآخر 100 محاولة فقط
+        if (count($failed_attempts) > 100) {
+            $failed_attempts = array_slice($failed_attempts, -100);
+        }
+        
+        update_option('osint_failed_login_attempts', $failed_attempts, false);
+        
+        // زيادة العداد
+        $count = (int) get_option('osint_failed_login_count', 0);
+        update_option('osint_failed_login_count', $count + 1, false);
+    });
+    
+    // تسجيل حدث عند تسجيل الدخول الناجح
+    add_action('wp_login', function($user_login, $user) {
+        osint_log_security_event(
+            'login_success',
+            sprintf('تسجيل دخول ناجح للمستخدم: %s', $user_login),
+            [
+                'user_id' => $user->ID,
+                'username' => $user_login,
+                'roles' => $user->roles,
+            ]
+        );
+    }, 10, 2);
 }
 
 /**
@@ -146,64 +206,5 @@ function osint_daily_security_cleanup() {
     }
 }
 
-// تهيئة النظام عند التحميل
-osint_initialize_security();
-
-// إضافة إجراءات AJAX الآمنة
-add_action('wp_ajax_osint_verify_security', function() {
-    osint_verify_ajax_request('osint_security_check', true, 'read');
-    wp_send_json_success([
-        'status' => 'secure',
-        'timestamp' => current_time('mysql'),
-        'ip' => osint_get_client_ip(),
-    ]);
-});
-
-// تسجيل حدث عند تسجيل الدخول الفاشل
-add_action('wp_login_failed', function($username) {
-    $ip = osint_get_client_ip();
-    
-    // تسجيل الحدث
-    osint_log_security_event(
-        'login_failed',
-        sprintf('محاولة دخول فاشلة للمستخدم: %s', $username),
-        ['username' => $username, 'ip' => $ip]
-    );
-    
-    // تتبع المحاولات
-    $failed_attempts = get_option('osint_failed_login_attempts', []);
-    if (!is_array($failed_attempts)) {
-        $failed_attempts = [];
-    }
-    
-    $failed_attempts[] = [
-        'username' => $username,
-        'ip' => $ip,
-        'timestamp' => time(),
-        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-    ];
-    
-    // الاحتفاظ بآخر 100 محاولة فقط
-    if (count($failed_attempts) > 100) {
-        $failed_attempts = array_slice($failed_attempts, -100);
-    }
-    
-    update_option('osint_failed_login_attempts', $failed_attempts, false);
-    
-    // زيادة العداد
-    $count = (int) get_option('osint_failed_login_count', 0);
-    update_option('osint_failed_login_count', $count + 1, false);
-});
-
-// تسجيل حدث عند تسجيل الدخول الناجح
-add_action('wp_login', function($user_login, $user) {
-    osint_log_security_event(
-        'login_success',
-        sprintf('تسجيل دخول ناجح للمستخدم: %s', $user_login),
-        [
-            'user_id' => $user->ID,
-            'username' => $user_login,
-            'roles' => $user->roles,
-        ]
-    );
-}, 10, 2);
+// ملاحظة: لا تستدعِ osint_initialize_security() هنا
+// يجب استدعاؤها من الملف الرئيسي بعد تحميل جميع الملفات

@@ -15,7 +15,14 @@
 if (!defined('ABSPATH')) exit;
 
 // تحميل وحدات الأمان والتنظيف
+require_once __DIR__ . '/includes/security/class-security-fixes.php';
+require_once __DIR__ . '/includes/security/class-sanitization-utils.php';
+require_once __DIR__ . '/includes/security/class-input-validator.php';
+require_once __DIR__ . '/includes/security/class-file-upload-security.php';
 require_once __DIR__ . '/includes/security/class-security-loader.php';
+
+// تهيئة نظام الأمان بعد تحميل جميع الملفات
+osint_initialize_security();
 
 $sod_inc_base = __DIR__ . '/includes';
 if (is_dir($sod_inc_base)) {
@@ -6764,6 +6771,10 @@ register_activation_hook(__FILE__, function () {
     // تفعيل تحديثات الحرب المركبة
     if (function_exists('sod_activate_hybrid_warfare_update')) {
         sod_activate_hybrid_warfare_update();
+    }
+    // إعداد سجلات الأمان
+    if (function_exists('osint_setup_security_logging')) {
+        osint_setup_security_logging();
     }
 });
 
