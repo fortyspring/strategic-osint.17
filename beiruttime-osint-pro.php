@@ -17349,4 +17349,3 @@ function so_ma_admin_footer_panel() {
     </script>';
 }
 add_action('admin_footer', 'so_ma_admin_footer_panel', 99);
-}
