@@ -1,63 +1,29 @@
 ```
-# Environment
-.env
-.env.local
-.env.*
+# Dependencies
+vendor/
+node_modules/
 
 # Logs
 *.log
 
-# Temporary files
-*.tmp
-*.swp
+# Environment
+.env
+.env.local
+*.env.*
 
-# Dependencies
-node_modules/
-vendor/
-
-# Build artifacts
-dist/
-build/
-target/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+# Coverage reports
+coverage/
+htmlcov/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-*.sublime-workspace
-.pytest_cache/
-.mypy_cache/
 
-# PHP
-*.php~
-*.php.bak
-*.bak
-*.tmp
-composer.lock
-vendor/
+# IDE
+.vscode/
+.idea/
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+
+# Tests
+.phpunit.result.cache
 ```
