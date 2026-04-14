@@ -1,10 +1,10 @@
-```
-# Patch files
-*.patch
+# Compiled and build artifacts
+*.pyc
+__pycache__/
 
-# PHP specific
-*.php~
-*.php.bak
+# Dependencies
+vendor/
+composer.lock
 
 # Logs and temp files
 *.log
@@ -14,18 +14,24 @@
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
 # Editors
 .vscode/
 .idea/
 
-# Dependencies
-node_modules/
-vendor/
+# OS generated files
+.DS_Store
+Thumbs.db
 
-# Build artifacts
-dist/
-build/
-target/
-```
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# PHP specific
+*.phar
+.php_cs.cache
+
+# Original rules preserved
+*.log

@@ -1568,7 +1568,7 @@ function so_reanalyze_all_news_events($limit = 3000, $offset = 0) {
     }
 
     $next_offset = $offset + count($rows);
-    $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+    $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table}", []));
     $done = $next_offset >= $total;
 
     $train = ['scanned' => 0, 'learned' => 0, 'deferred' => 1];
@@ -1742,7 +1742,7 @@ function so_reanalyze_all_news_events_full($batch = 1000, $reset = false) {
     }
 
     $offset = (int) get_option('so_reanalyze_cursor', 0);
-    $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+    $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table}", []));
 
     $result = so_reanalyze_all_news_events($batch, $offset);
     $next_offset = (int)($result['next_offset'] ?? $offset);
@@ -3039,7 +3039,7 @@ class SO_DB_Manager {
 
     public static function seed_dictionaries() {
         global $wpdb;
-        if ($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_dict_actors") == 0) {
+        if ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}so_dict_actors", [])) == 0) {
             $actors = [
                 ['LB_ARMY','الجيش اللبناني',0.5,30,'الجيش اللبناني,الدولة اللبنانية,الحكومة اللبنانية,قوى الأمن الداخلي'],
                 ['NSA_LB_001','المقاومة الإسلامية (حزب الله)',0.85,35,'حزب الله,المقاومة الإسلامية في لبنان,المقاومة الاسلامية,نصرالله,نعيم قاسم,قوة الرضوان'],
@@ -3095,7 +3095,7 @@ class SO_DB_Manager {
             ];
             foreach ($actors as $a) $wpdb->insert("{$wpdb->prefix}so_dict_actors", ['actor_id'=>$a[0],'name_ar'=>$a[1],'threat_weight'=>$a[2],'base_threat'=>$a[3],'keywords'=>$a[4]]);
         }
-        if ($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_dict_weapons") == 0) {
+        if ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}so_dict_weapons", [])) == 0) {
             $weapons = [
                 ['WPN_UAV','مسيرة',40,'مسيرة,مسيّرة,درون,طائرة بدون طيار,طائرات مسيرة'],
                 ['WPN_BM','صاروخ باليستي',100,'صاروخ باليستي,باليستي,صواريخ بالستية'],
@@ -3686,7 +3686,7 @@ class SO_OSINT_Engine {
         if (self::$actor_threat_cache === null) {
             global $wpdb;
             self::$actor_threat_cache = [];
-            $rows = $wpdb->get_results("SELECT name_ar, keywords, base_threat FROM {$wpdb->prefix}so_dict_actors", ARRAY_A);
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT name_ar, keywords, base_threat FROM {$wpdb->prefix}so_dict_actors", []), ARRAY_A);
             foreach ($rows as $row) {
                 self::$actor_threat_cache[$row['name_ar']] = (int)$row['base_threat'];
                 foreach (array_map('trim', explode(',', $row['keywords'])) as $kw) if ($kw) self::$actor_threat_cache[$kw] = (int)$row['base_threat'];
@@ -3699,7 +3699,7 @@ class SO_OSINT_Engine {
         if (self::$weapon_impact_cache === null) {
             global $wpdb;
             self::$weapon_impact_cache = [];
-            $rows = $wpdb->get_results("SELECT name_ar, keywords, impact_score FROM {$wpdb->prefix}so_dict_weapons", ARRAY_A);
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT name_ar, keywords, impact_score FROM {$wpdb->prefix}so_dict_weapons", []), ARRAY_A);
             foreach ($rows as $row) {
                 self::$weapon_impact_cache[$row['name_ar']] = (int)$row['impact_score'];
                 foreach (array_map('trim', explode(',', $row['keywords'])) as $kw) if ($kw) self::$weapon_impact_cache[$kw] = (int)$row['impact_score'];
@@ -9336,7 +9336,7 @@ class SO_Admin_UI {
                 echo "<p style='color:green'><strong>تمت معالجة {$processed} حدث بنجاح.</strong> (أخطاء: {$errors})</p>";
                 
                 // التحقق مما إذا كانت هناك أحداث متبقية
-                $remaining = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE threat_score = 0 OR threat_score IS NULL");
+                $remaining = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table_name} WHERE threat_score = 0 OR threat_score IS NULL", []));
                 
                 if ($remaining > 0) {
                     echo '<div id="bt-auto-continue" style="margin-top:15px; padding:15px; background:#e8f5e9; border-radius:8px; border:1px solid #4caf50;">';
@@ -9395,8 +9395,8 @@ class SO_Admin_UI {
             }
             echo '</div>';
         } else {
-            $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
-            $pending = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_name} WHERE threat_score = 0 OR threat_score IS NULL");
+            $total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table_name}", []));
+            $pending = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table_name} WHERE threat_score = 0 OR threat_score IS NULL", []));
             ?>
             <h2>🛠️ إعادة بناء الأرشفة الاستخباراتية</h2>
             <p>إعادة تحليل الأحداث القديمة باستخدام محركات الحرب المركبة وOSINT المتقدم.</p>
@@ -9942,9 +9942,9 @@ class SO_Admin_UI {
         self::admin_wrap_open();
         self::admin_nav('strategic-osint');
         global $wpdb;
-        $total_events = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events");
-        $critical_24h = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events WHERE score >= 140 AND event_timestamp >= ".(time()-86400));
-        $latest = $wpdb->get_row("SELECT title, score, region, actor_v2, event_timestamp FROM {$wpdb->prefix}so_news_events ORDER BY event_timestamp DESC LIMIT 1", ARRAY_A);
+        $total_events = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events", []));
+        $critical_24h = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events WHERE score >= %d AND event_timestamp >= %d", 140, time()-86400));
+        $latest = $wpdb->get_row($wpdb->prepare("SELECT title, score, region, actor_v2, event_timestamp FROM {$wpdb->prefix}so_news_events ORDER BY event_timestamp DESC LIMIT 1", []), ARRAY_A);
         $sources_count = count(get_option('so_sources',[])) + count(get_option('so_tg_sources',[])) + count(get_option('so_x_sources',[]));
         $api_key = get_option('so_external_api_key','');
         ?>
@@ -11214,8 +11214,8 @@ public static function ajax_duplicate_cleanup_batch() {
     }
 
     if (!empty($delete_ids)) {
-        $in = implode(',', array_map('intval', $delete_ids));
-        $wpdb->query("DELETE FROM {$table} WHERE id IN ({$in})");
+        $placeholders = implode(',', array_fill(0, count($delete_ids), '%d'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id IN ($placeholders)", $delete_ids));
     }
 
     // keep seen bounded
@@ -11636,7 +11636,7 @@ public static function ajax_reanalyze_reset() {
                 <tbody>
                 <?php foreach ($tables as $table => $desc):
                     $full_table = $wpdb->prefix . $table;
-                    $count = $wpdb->get_var("SELECT COUNT(*) FROM {$full_table}") ?? '—';
+                    $count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$full_table}", [])) ?? '—';
                     $size_row = $wpdb->get_row($wpdb->prepare("SELECT ROUND((DATA_LENGTH+INDEX_LENGTH)/1024,1) AS size FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s", $full_table));
                     $size = $size_row ? number_format((float)$size_row->size, 1) . ' KB' : '—'; ?>
                 <tr>
@@ -11661,7 +11661,7 @@ public static function ajax_reanalyze_reset() {
                 $p_batch = (int)($progress['batch'] ?? 10);
                 $p_updated = (int)($progress['updated'] ?? 0);
                 if ($p_total <= 0) {
-                    $p_total = (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events");
+                    $p_total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}so_news_events", []));
                 }
             ?>
             <h3>🚀 إعادة التحليل الكامل (AJAX)</h3>
@@ -11811,7 +11811,7 @@ public static function ajax_reanalyze_reset() {
         }
 
         // Top regions and actors
-        $top_regions = $wpdb->get_results("SELECT region, COUNT(*) as cnt, AVG(score) as avg_score FROM {$wpdb->prefix}so_news_events GROUP BY region ORDER BY cnt DESC LIMIT 10", ARRAY_A);
+        $top_regions = $wpdb->get_results($wpdb->prepare("SELECT region, COUNT(*) as cnt, AVG(score) as avg_score FROM {$wpdb->prefix}so_news_events GROUP BY region ORDER BY cnt DESC LIMIT 10", []), ARRAY_A);
         if ($top_regions): ?>
         <div class="so-admin-card">
             <h3>🌍 أكثر المناطق تسجيلاً</h3>
