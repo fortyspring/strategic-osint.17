@@ -299,7 +299,7 @@ function sod_force_clean_learning_banks(): void {
 function sod_clean_entity_graph_records(): int {
     global $wpdb;
     $table = $wpdb->prefix . 'so_entity_graph';
-    $rows = $wpdb->get_results("SELECT id, actor_name, target_name, region FROM {$table}", ARRAY_A);
+    $rows = $wpdb->get_results($wpdb->prepare("SELECT id, actor_name, target_name, region FROM {$table}", []), ARRAY_A);
     if (!is_array($rows) || empty($rows)) return 0;
     $updated = 0;
     foreach ($rows as $row) {
@@ -1485,8 +1485,8 @@ function so_cleanup_duplicate_news_events($limit = 1200) {
     }
 
     if (!empty($delete_ids)) {
-        $in = implode(',', array_map('intval', $delete_ids));
-        $wpdb->query("DELETE FROM {$table} WHERE id IN ({$in})");
+        $placeholders = implode(',', array_fill(0, count($delete_ids), '%d'));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id IN ($placeholders)", $delete_ids));
     }
 
     return ['deleted' => count($delete_ids), 'kept' => count($rows) - count($delete_ids)];
@@ -3939,8 +3939,8 @@ class SO_Cron_Manager {
             $keep_id = (int)$events[0]['id'];
             $del_ids = array_map(fn($e)=>(int)$e['id'], array_slice($events, 1));
             if (!empty($del_ids)) {
-                $placeholders = implode(',', $del_ids);
-                $wpdb->query("DELETE FROM $t WHERE id IN ($placeholders) AND score < 140");
+                $placeholders = implode(',', array_fill(0, count($del_ids), '%d'));
+                $wpdb->query($wpdb->prepare("DELETE FROM $t WHERE id IN ($placeholders) AND score < 140", $del_ids));
                 $removed += count($del_ids);
             }
         }
@@ -4346,7 +4346,9 @@ class SO_API_Manager {
         return rest_ensure_response(['success'=>true,'data'=>$events]);
     }
     public static function get_analytics($request) {
-        global $wpdb; $events = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}so_news_events WHERE event_timestamp >= ".(time()-86400),ARRAY_A);
+        global $wpdb; 
+        $cutoff = time() - 86400;
+        $events = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}so_news_events WHERE event_timestamp >= %d", $cutoff), ARRAY_A);
         return rest_ensure_response(['success'=>true,'data'=>sod_build_analytics($events?:[])]);
     }
     public static function get_brief($request) {
@@ -4587,8 +4589,11 @@ function sod_ajax_dashboard_data_v2(): void {
             wp_send_json_error(['message'=>'خطأ في التحقق'],403);
         }
     }
-    $hours=(int)($_POST['hours']??24); $region=sanitize_text_field(wp_unslash($_POST['region']??'all')); $min_score=max(0,(int)($_POST['min_score']??0));
-    $events=sod_get_events(['hours'=>max(1,min(8760,$hours)),'region'=>$region,'min_score'=>$min_score,'limit'=>2000]);
+    $hours = isset($_POST['hours']) ? absint($_POST['hours']) : 24;
+    $hours = max(1, min(8760, $hours));
+    $region = sanitize_text_field(wp_unslash($_POST['region'] ?? 'all'));
+    $min_score = isset($_POST['min_score']) ? absint($_POST['min_score']) : 0;
+    $events = sod_get_events(['hours' => $hours, 'region' => $region, 'min_score' => $min_score, 'limit' => 2000]);
     $analytics=sod_build_analytics($events);
     $safe_events=array_map(function($ev){$wd=sod_parse_json_array($ev['war_data']??'{}');return['id'=>(int)$ev['id'],'title'=>wp_strip_all_tags((string)$ev['title']),'link'=>esc_url_raw((string)($ev['link']??SOD_TG_LINK)),'source_name'=>sanitize_text_field((string)$ev['source_name']),'source_color'=>sanitize_hex_color((string)($ev['source_color']??'#1da1f2'))?:'#1da1f2','intel_type'=>sanitize_text_field((string)$ev['intel_type']),'tactical_level'=>sanitize_text_field((string)$ev['tactical_level']),'region'=>sanitize_text_field((string)$ev['region']),'actor_v2'=>sanitize_text_field((string)$ev['actor_v2']),'score'=>(int)$ev['score'],'event_timestamp'=>(int)$ev['event_timestamp'],'image_url'=>esc_url_raw((string)($ev['image_url']??'')),'llm_verified'=>(bool)$ev['llm_verified'],'evaluation_mode'=>(string)($wd['evaluation_mode']??'auto'),'evaluation_label'=>(string)($wd['evaluation_label']??'آلي'),'has_manual_override'=>!empty(($wd['manual_override']['enabled']??false)),'war_data'=>$ev['war_data']??'{}','field_data'=>$ev['field_data']??'{}'];},array_slice($events,0,500));
     wp_send_json_success(['events'=>$safe_events,'analytics'=>$analytics,'time'=>time()]);
@@ -4693,8 +4698,9 @@ function sod_ajax_heatmap_data_v2(): void {
             wp_send_json_error(['message'=>'خطأ في التحقق'],403);
         }
     }
-    $hours = (int)($_POST['hours'] ?? 72);
-    $events = sod_get_events(['hours' => max(1, min(8760, $hours)), 'limit' => 5000]);
+    $hours = isset($_POST['hours']) ? absint($_POST['hours']) : 72;
+    $hours = max(1, min(8760, $hours));
+    $events = sod_get_events(['hours' => $hours, 'limit' => 5000]);
     $heat_points = [];
     foreach ($events as $ev) {
         $lat = (float)($ev['latitude'] ?? 0);
@@ -4961,7 +4967,7 @@ function sod_add_bank_value(string $key, string $value, array $extra = []): arra
     if ($canon === 'actors') {
         $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}so_dict_actors WHERE name_ar=%s", $value));
         if (!$exists) {
-            $next_id = (int)$wpdb->get_var("SELECT COALESCE(MAX(id),0)+1 FROM {$wpdb->prefix}so_dict_actors");
+            $next_id = (int)$wpdb->get_var($wpdb->prepare("SELECT COALESCE(MAX(id),0)+1 FROM {$wpdb->prefix}so_dict_actors", []));
             $actor_id = 'ACT_CUSTOM_' . $next_id;
             $keywords = $extra['keywords'] ?? $value;
             $threat_weight = (float)($extra['threat_weight'] ?? 1.0);
@@ -4977,7 +4983,7 @@ function sod_add_bank_value(string $key, string $value, array $extra = []): arra
     } elseif ($canon === 'weapons') {
         $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}so_dict_weapons WHERE name_ar=%s", $value));
         if (!$exists) {
-            $next_id = (int)$wpdb->get_var("SELECT COALESCE(MAX(id),0)+1 FROM {$wpdb->prefix}so_dict_weapons");
+            $next_id = (int)$wpdb->get_var($wpdb->prepare("SELECT COALESCE(MAX(id),0)+1 FROM {$wpdb->prefix}so_dict_weapons", []));
             $weapon_id = 'WPN_CUSTOM_' . $next_id;
             $keywords = $extra['keywords'] ?? $value;
             $impact_score = (int)($extra['impact_score'] ?? 50);
@@ -5859,6 +5865,9 @@ class SO_Executive_Reports {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        // تفعيل التحقق من SSL لأسباب أمنية
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         // تعطيل إعادة التوجيه التلقائي لأسباب أمنية
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
         curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);

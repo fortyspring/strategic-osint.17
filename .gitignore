@@ -1,0 +1,31 @@
+```
+# Patch files
+*.patch
+
+# PHP specific
+*.php~
+*.php.bak
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+dist/
+build/
+target/
+```
